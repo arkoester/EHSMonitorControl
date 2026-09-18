@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EHS Room Displays</title>
+<style>
+  :root { --bg:#0E1116; --card:#1A1F27; --edge:#2A313C; --ink:#F2F4F7; --dim:#8A94A3; --tiger:#F26B1D; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { min-height:100%; }
+  body { background:var(--bg); color:var(--ink); font-family:"Segoe UI",system-ui,Roboto,Arial,sans-serif;
+         display:flex; flex-direction:column; align-items:center; padding:5vh 4vw; }
+  header { text-align:center; margin-bottom:3vh; }
+  .kick { color:var(--tiger); font-weight:700; letter-spacing:.24em; text-transform:uppercase; font-size:clamp(11px,1.4vw,15px); }
+  h1 { font-size:clamp(26px,4.5vw,52px); font-weight:800; margin-top:.4em; }
+  .sub { color:var(--dim); margin-top:.6em; font-size:clamp(13px,1.6vw,18px); }
+  #search { width:min(460px,92vw); font-size:clamp(15px,1.7vw,20px); padding:.65em 1.1em; margin-bottom:3.2vh;
+            border-radius:999px; border:1px solid var(--edge); background:var(--card); color:var(--ink); outline:none; }
+  #search:focus { border-color:var(--tiger); }
+  #wings { width:min(980px,100%); }
+  .wing { margin-bottom:3.4vh; }
+  .wing h2 { color:var(--dim); font-size:clamp(12px,1.4vw,16px); letter-spacing:.18em; text-transform:uppercase;
+             border-bottom:1px solid var(--edge); padding-bottom:.5em; margin-bottom:1.4vh; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+  a.tile { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+           background:var(--card); border:1px solid var(--edge); border-radius:16px; padding:20px 8px;
+           text-decoration:none; color:var(--ink); transition:border-color .15s, transform .15s; }
+  a.tile:hover, a.tile:focus { border-color:var(--tiger); transform:translateY(-2px); outline:none; }
+  .room { font-size:clamp(20px,2.6vw,32px); font-weight:800; letter-spacing:.03em; }
+  .who { color:var(--dim); font-size:clamp(11px,1.2vw,13px); min-height:1.2em; text-align:center; }
+  .actions { margin-top:1.5vh; display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  a.btn { border:1px solid var(--edge); border-radius:999px; padding:12px 22px; color:var(--ink);
+          text-decoration:none; font-size:clamp(13px,1.5vw,16px); background:var(--card); }
+  a.btn.primary { background:var(--tiger); border-color:var(--tiger); color:#111; font-weight:700; }
+  #empty { color:var(--dim); text-align:center; padding:4vh 0; display:none; }
+  footer { margin-top:auto; padding-top:4vh; color:var(--dim); font-size:12px; text-align:center; line-height:1.7; }
+  code { color:var(--ink); background:var(--card); border:1px solid var(--edge); border-radius:6px; padding:1px 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="kick">Edwardsville High School</div>
+  <h1>Room Displays</h1>
+  <div class="sub">Pick a room to preview its screen. Each classroom screen remembers its own room.</div>
+</header>
+
+<input id="search" type="search" placeholder="Search room or teacher" autocomplete="off">
+
+<div id="wings"></div>
+<div id="empty">No rooms match.</div>
+
+<div class="actions">
+  <a class="btn primary" id="demoLink" href="room.html?room=A124&amp;demo=1">Demo tour (A124)</a>
+  <a class="btn" id="mychip" href="room.html" style="display:none"></a>
+</div>
+
+<footer>
+  One page serves every room &mdash; kiosks just open <code>room.html</code> and pick their room once.<br>
+  The room list comes from the Rooms tab of the Google Sheet set in <code>config.js</code>.
+</footer>
+
+<script src="config.js"></script>
+<script>
+  /* Fallback room list, used until a Sheet is configured in config.js. label = teacher or dept. */
+  var ROOMS = [
+    { room: 'A116', label: '' },
+    { room: 'A122', label: '' },
+    { room: 'A123', label: '' },
+    { room: 'A124', label: 'Mr. Koester' },
+    { room: 'A125', label: '' },
+    { room: 'A210', label: '' }
+  ];
+
+  var qs = {}, extra = '';
+  location.search.replace(/^\?/, '').split('&').forEach(function (p) {
+    if (!p) { return; }
+    var kv = p.split('='); qs[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1] || '').replace(/\+/g, ' '));
+  });
+  if (qs.sheet) { extra += '&sheet=' + encodeURIComponent(qs.sheet); }
+  if (qs.json) { extra += '&json=' + encodeURIComponent(qs.json); }
+
+  var cfg = {};
+  try { cfg = window.EHS_CONFIG || {}; } catch (e) {}
+  var SHEET_ID = qs.sheet || cfg.sheetId || '';
+
+  /* ---- tiny CSV helpers (quoted commas and newlines safe) ---- */
+  function parseCSV(text) {
+    var rows = [], row = [], cur = '', q = false, i, c;
+    for (i = 0; i < text.length; i++) {
+      c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else { q = false; } }
+        else { cur += c; }
+      } else if (c === '"') { q = true; }
+      else if (c === ',') { row.push(cur); cur = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') { i++; }
+        row.push(cur); rows.push(row); row = []; cur = '';
+      } else { cur += c; }
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  function norm(h) { return String(h || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
+  function rowsToObjects(rows) {
+    if (!rows || !rows.length) { return []; }
+    var h = 0, i, c, n;
+    for (i = 0; i < rows.length; i++) {
+      n = 0;
+      for (c = 0; c < rows[i].length; c++) { if (String(rows[i][c] == null ? '' : rows[i][c]).trim()) { n++; } }
+      if (n >= 2) { h = i; break; }
+    }
+    var headers = rows[h].map(norm), out = [], r, obj, any, v;
+    for (r = h + 1; r < rows.length; r++) {
+      obj = {}; any = false;
+      for (c = 0; c < headers.length; c++) {
+        if (!headers[c]) { continue; }
+        v = String(rows[r][c] == null ? '' : rows[r][c]).trim();
+        obj[headers[c]] = v; if (v) { any = true; }
+      }
+      if (any) { out.push(obj); }
+    }
+    return out;
+  }
+
+  /* ---- build the grouped, searchable grid ---- */
+  var wings = document.getElementById('wings'), empty = document.getElementById('empty');
+  var list = [];
+
+  function groupKey(room) {
+    var m = /^([A-Za-z]+)\s*(\d)/.exec(room);
+    return m ? (m[1].toUpperCase() + m[2] + '00s') : 'Other';
+  }
+  function render(filter) {
+    var f = (filter || '').toLowerCase(), groups = {}, order = [], i, r, k;
+    for (i = 0; i < list.length; i++) {
+      r = list[i];
+      if (f && r.room.toLowerCase().indexOf(f) === -1 && (r.label || '').toLowerCase().indexOf(f) === -1) { continue; }
+      k = groupKey(r.room);
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(r);
+    }
+    order.sort();
+    wings.innerHTML = '';
+    for (i = 0; i < order.length; i++) {
+      k = order[i];
+      var sec = document.createElement('section'); sec.className = 'wing';
+      var h = document.createElement('h2'); h.textContent = k; sec.appendChild(h);
+      var grid = document.createElement('div'); grid.className = 'grid';
+      groups[k].sort(function (a, b) { return a.room.localeCompare(b.room, undefined, { numeric: true }); });
+      groups[k].forEach(function (r) {
+        var a = document.createElement('a');
+        a.className = 'tile';
+        a.href = 'room.html?room=' + encodeURIComponent(r.room) + extra;
+        a.innerHTML = '<span class="room">' + r.room + '</span><span class="who">' + (r.label || '&nbsp;') + '</span>';
+        grid.appendChild(a);
+      });
+      sec.appendChild(grid); wings.appendChild(sec);
+    }
+    empty.style.display = order.length ? 'none' : 'block';
+  }
+
+  function fromObjects(objs) {
+    var seen = {}, out = [], i, r;
+    for (i = 0; i < objs.length; i++) {
+      r = objs[i].room;
+      if (!r || seen[r]) { if (r && !seen[r].label && objs[i].teacher) { seen[r].label = objs[i].teacher; } continue; }
+      seen[r] = { room: r, label: objs[i].teacher || '' };
+      out.push(seen[r]);
+    }
+    return out;
+  }
+
+  list = ROOMS.slice();
+  render('');
+
+  /* Compiled pipeline: the nightly data.json beside this page is the primary room registry. */
+  fetch('data.json?_=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) { throw new Error(r.status); } return r.json();
+  }).then(function (d) {
+    var fresh = fromObjects(d.rooms || []);
+    if (fresh.length) { list = fresh; render(document.getElementById('search').value); }
+  }).catch(function () { /* fall through to the Sheet or the built-in list */ });
+
+  if (SHEET_ID) {
+    var url = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(SHEET_ID) +
+              '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent('Rooms') + '&cb=' + Date.now();
+    fetch(url, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) { throw new Error(r.status); } return r.text();
+    }).then(function (t) {
+      var objs = rowsToObjects(parseCSV(t));
+      var fresh = fromObjects(objs);
+      if (fresh.length) { list = fresh; render(document.getElementById('search').value); }
+    }).catch(function () { /* keep the fallback list */ });
+  }
+
+  document.getElementById('search').oninput = function () { render(this.value); };
+
+  var demo = document.getElementById('demoLink');
+  demo.href = 'room.html?room=A124&demo=1' + extra;
+
+  try {
+    var saved = window.localStorage.getItem('ehs_room');
+    if (saved) {
+      var chip = document.getElementById('mychip');
+      chip.textContent = 'This screen: ' + saved;
+      chip.style.display = '';
+    }
+  } catch (e) {}
+</script>
+</body>
+</html>

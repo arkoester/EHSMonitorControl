@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EHS Room Display</title>
+<style>
+  :root {
+    --ink: #14161A;
+    --panel: #1E2127;
+    --line: #2C3038;
+    --chalk: #F4F1EA;
+    --dust: #9AA0AA;
+    --tiger: #F26B1D;
+    --tiger-deep: #B9480A;
+    --display: "Bahnschrift Condensed", "Bahnschrift", "Roboto Condensed", "Arial Narrow", "Segoe UI", Roboto, sans-serif;
+    --body: "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--ink); color: var(--chalk); font-family: var(--body);
+    overflow: hidden; -webkit-user-select: none; user-select: none; cursor: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.demo { cursor: default; }
+  .view { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms ease; }
+  .view.active { opacity: 1; }
+  .view[hidden] { display: none; }
+
+  /* Period timeline: the one thing readable from the back row at any moment. */
+  #bar { position: absolute; top: 0; left: 0; right: 0; height: 1.1vh; background: var(--line); z-index: 5; }
+  #bar[hidden] { display: none; }
+  #barfill { height: 100%; width: 0; background: var(--tiger); transition: width 900ms linear; }
+  #barmark { position: absolute; top: 0; height: 100%; width: 2px; background: var(--chalk); opacity: .55; }
+
+  /* Targets card */
+  #targets { display: flex; flex-direction: column; padding: 4.2vh 4.5vw 3.4vh; }
+  .eyebrow { display: flex; justify-content: space-between; align-items: baseline; gap: 2vw; }
+  .course { font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; font-size: 2.3vw; color: var(--tiger); font-weight: 600; }
+  .course .sep { color: var(--dust); margin: 0 .5em; font-weight: 400; }
+  .course .period { color: var(--chalk); }
+  .clock { font-family: var(--display); font-size: 2.6vw; font-variant-numeric: tabular-nums; color: var(--chalk); letter-spacing: .02em; }
+  .unit { font-size: 3.1vw; font-weight: 600; line-height: 1.15; margin: 1.6vh 0 2.6vh; letter-spacing: -.01em; }
+  .grid { flex: 1; display: grid; grid-template-columns: 3fr 2fr; gap: 3.2vw; min-height: 0; overflow: hidden; }
+  .col h2 { margin: 0 0 1.4vh; font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: 1.45vw; color: var(--dust); font-weight: 600; }
+  .col ul { list-style: none; margin: 0; padding: 0; }
+  .col li { position: relative; padding-left: 1.5em; line-height: 1.25; margin-bottom: 1.6vh; }
+  .lt li { font-size: 3.0vw; font-weight: 600; }
+  .lt li::before { content: ""; position: absolute; left: .1em; top: .42em; width: .48em; height: .48em; background: var(--tiger); border-radius: 50%; }
+  .sc li { font-size: 2.15vw; color: var(--chalk); }
+  .sc li::before { content: "\2713"; position: absolute; left: 0; top: 0; color: var(--tiger); font-weight: 700; }
+  .lt.n3 li { font-size: 2.6vw; }
+  .lt.n4 li { font-size: 2.25vw; }
+  .lt.n5 li { font-size: 2.0vw; }
+  .sc.n4 li { font-size: 1.9vw; }
+  .sc.n5 li { font-size: 1.7vw; }
+  .foot { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 1.8vh; margin-top: 1.2vh; font-size: 1.5vw; color: var(--dust); }
+  .foot b { color: var(--chalk); font-weight: 600; }
+  .empty { color: var(--dust); font-size: 2vw; }
+
+  /* Deck and video: full bleed */
+  .frame { position: absolute; inset: 0; background: #000; }
+  .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2vh; background: var(--panel); color: var(--dust); text-align: center; padding: 6vw; }
+  .placeholder .big { font-family: var(--display); text-transform: uppercase; letter-spacing: .1em; font-size: 3vw; color: var(--chalk); }
+  .placeholder .small { font-size: 1.5vw; max-width: 60vw; }
+
+  /* Corner chip during deck and video */
+  #chip { position: absolute; right: 1.6vw; bottom: 2.4vh; z-index: 6; display: flex; gap: 1.2vw; align-items: baseline; background: rgba(20,22,26,.78); color: var(--chalk); padding: 1.1vh 1.4vw; border-radius: .6vw; font-family: var(--display); letter-spacing: .04em; }
+  #chip[hidden] { display: none; }
+  #chip .t { font-size: 1.9vw; font-variant-numeric: tabular-nums; }
+  #chip .n { font-size: 1.3vw; color: var(--dust); text-transform: uppercase; }
+  #chip .n b { color: var(--tiger); font-weight: 600; }
+
+  /* Broadcast */
+  #banner { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--tiger); color: var(--ink); padding: 2.2vh 3vw; font-size: 2.4vw; font-weight: 600; line-height: 1.25; }
+  #banner.urgent { top: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 4.6vw; padding: 6vw; }
+  #banner[hidden] { display: none; }
+
+  /* Health dot: green fresh, amber stale, red never loaded */
+  #status { position: absolute; left: .8vw; bottom: 1.2vh; width: .7vw; height: .7vw; min-width: 6px; min-height: 6px; border-radius: 50%; background: #3B6D11; opacity: .8; z-index: 9; }
+  #status.stale { background: #BA7517; }
+  #status.down { background: #A32D2D; }
+
+  /* Demo controls (only with ?demo=1) */
+  #demo { position: absolute; top: 0; left: 0; right: 0; height: 58px; z-index: 20; background: #23262D; border-bottom: 1px solid var(--line); padding: 6px 10px; font-size: 13px; color: var(--chalk); display: flex; align-items: center; gap: 12px; overflow-x: auto; white-space: nowrap; }
+  #demo[hidden] { display: none; }
+  body.demo .view, body.demo #bar { top: 58px; }
+  #demo .row { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; }
+  #demo button { font: inherit; background: var(--line); color: var(--chalk); border: 1px solid #3a3f49; border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+  #demo button:focus-visible, #demo select:focus-visible { outline: 2px solid var(--tiger); outline-offset: 1px; }
+  #demo button.on { background: var(--tiger); color: var(--ink); border-color: var(--tiger); }
+  #demo select { font: inherit; background: var(--line); color: var(--chalk); border: 1px solid #3a3f49; border-radius: 6px; padding: 5px; }
+  #demo .read { color: var(--dust); font-variant-numeric: tabular-nums; }
+  #demo .hint { color: var(--dust); }
+
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; gap: 2vh; align-content: start; }
+    #targets { padding: 3vh 5vw 2vh; }
+    .course { font-size: 3.6vw; } .clock { font-size: 4vw; } .unit { font-size: 5vw; }
+    .col h2 { font-size: 2.6vw; }
+    .lt li, .lt.n3 li, .lt.n4 li, .lt.n5 li { font-size: 4.2vw; }
+    .sc li, .sc.n4 li, .sc.n5 li { font-size: 3.4vw; }
+    .foot { font-size: 2.6vw; }
+    #chip .t { font-size: 3.4vw; } #chip .n { font-size: 2.4vw; }
+    #banner { font-size: 3.6vw; }
+    .placeholder .big { font-size: 5vw; } .placeholder .small { font-size: 3vw; max-width: 90vw; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .view { transition: none; } #barfill { transition: none; }
+  }
+
+#picker { position:fixed; inset:0; background:rgba(10,12,16,.96); z-index:60; display:flex; align-items:center; justify-content:center; }
+#picker[hidden] { display:none; }
+.pk-box { width:min(880px,92vw); max-height:88vh; overflow:auto; background:#141922; border:1px solid #2A313C; border-radius:20px; padding:4vh 4vw; text-align:center; }
+.pk-kick { color:#F26B1D; letter-spacing:.22em; text-transform:uppercase; font-weight:700; font-size:clamp(10px,1.2vw,14px); }
+.pk-box h2 { font-size:clamp(22px,3.4vw,42px); margin:.5em 0 .8em; }
+#pk-search { width:min(420px,80%); font-size:clamp(15px,1.6vw,20px); padding:.6em 1em; border-radius:999px; border:1px solid #2A313C; background:#0E1116; color:#F2F4F7; outline:none; margin-bottom:2.4vh; }
+#pk-search:focus { border-color:#F26B1D; }
+#pk-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; }
+#pk-grid button { font:inherit; font-weight:800; font-size:clamp(16px,2vw,24px); padding:18px 6px; border-radius:14px; border:1px solid #2A313C; background:#1A1F27; color:#F2F4F7; cursor:pointer; }
+#pk-grid button:hover, #pk-grid button:focus { border-color:#F26B1D; outline:none; }
+#pk-grid button.cur { border-color:#F26B1D; background:#2a2016; }
+.pk-note { color:#8A94A3; font-size:clamp(11px,1.2vw,14px); margin-top:2.6vh; }
+#setroom { position:fixed; right:10px; bottom:10px; z-index:55; width:34px; height:34px; border-radius:50%; border:1px solid #2A313C; background:rgba(26,31,39,.6); color:#8A94A3; font-size:18px; line-height:1; cursor:pointer; opacity:.35; }
+#setroom:hover { opacity:1; border-color:#F26B1D; color:#F2F4F7; }
+</style>
+</head>
+<body>
+<div id="bar" hidden><div id="barfill"></div><div id="barmark"></div></div>
+
+<main id="targets" class="view" hidden aria-live="polite">
+  <div class="eyebrow">
+    <div class="course"><span id="t-course"></span><span class="sep">&middot;</span><span class="period" id="t-period"></span></div>
+    <div class="clock" id="t-clock"></div>
+  </div>
+  <div class="unit" id="t-unit"></div>
+  <div class="grid">
+    <div class="col"><h2>Learning targets</h2><ul class="lt" id="t-lt"></ul></div>
+    <div class="col"><h2>Success criteria</h2><ul class="sc" id="t-sc"></ul></div>
+  </div>
+  <div class="foot"><div id="t-date"></div><div><b id="t-school"></b> &middot; <span id="t-room"></span></div></div>
+</main>
+
+<section id="deck" class="view" hidden><div class="frame" id="deck-frame"></div></section>
+<section id="video" class="view" hidden><div class="frame" id="video-frame"></div></section>
+
+<div id="chip" hidden><span class="t" id="c-clock"></span><span class="n" id="c-next"></span></div>
+<div id="banner" hidden></div>
+<script src="config.js"></script>
+<div id="picker" hidden>
+  <div class="pk-box">
+    <div class="pk-kick">Edwardsville High School</div>
+    <h2>Which room is this screen?</h2>
+    <input id="pk-search" type="search" placeholder="Type a room number" autocomplete="off">
+    <div id="pk-grid"></div>
+    <div class="pk-note">Saved on this screen only. The &#8942; button in the corner changes it later.</div>
+  </div>
+</div>
+<button id="setroom" title="Set this screen's room">&#8942;</button>
+<div id="status" class="down" title="data status"></div>
+
+<aside id="demo" hidden>
+  <div class="row">
+    <label>Room <select id="d-room"></select></label>
+    <button data-t="2026-08-27T07:18:00">7:18 live video</button>
+    <button data-t="2026-08-27T09:21:30">9:21 targets</button>
+    <button data-t="2026-08-27T10:40:00">10:40 deck</button>
+    <button data-t="2026-08-27T09:17:00">9:17 passing</button>
+    <button data-t="2026-08-27T14:30:00">2:30 after school</button>
+    <button data-t="2026-08-26T09:01:30">Wednesday</button>
+    <button id="d-bcast">Broadcast</button>
+    <button id="d-now">Live clock</button>
+  </div>
+  <div class="read" id="d-read"></div>
+  <div class="hint">Demo data. Add the sheet ID in CONFIG to go live.</div>
+</aside>
+
+<script>
+/* SignageEngine: pure scheduling logic for the room page. ES2015-safe (old Android WebView friendly). */
+(function (root) {
+  function norm(h) { return String(h == null ? '' : h).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
+  function pad(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
+  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+  function parseCSV(text) {
+    var rows = [], row = [], field = '', inQ = false, i, c;
+    text = String(text == null ? '' : text);
+    for (i = 0; i < text.length; i++) {
+      c = text[i];
+      if (inQ) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else { inQ = false; } }
+        else { field += c; }
+      } else {
+        if (c === '"') { inQ = true; }
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else if (c === '\r') { /* ignore */ }
+        else { field += c; }
+      }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+  function rowsToObjects(rows) {
+    if (!rows || !rows.length) { return []; }
+    /* Skip leading note/title rows: the header is the first row with 2+ non-empty cells. */
+    var h = 0, i, c2, n;
+    for (i = 0; i < rows.length; i++) {
+      n = 0;
+      for (c2 = 0; c2 < rows[i].length; c2++) { if (String(rows[i][c2] == null ? '' : rows[i][c2]).trim()) { n++; } }
+      if (n >= 2) { h = i; break; }
+    }
+    var headers = rows[h].map(norm), out = [], r, c, obj, any, v;
+    for (r = h + 1; r < rows.length; r++) {
+      obj = {}; any = false;
+      for (c = 0; c < headers.length; c++) {
+        v = String(rows[r][c] == null ? '' : rows[r][c]).trim();
+        if (v) { any = true; }
+        if (headers[c]) { obj[headers[c]] = v; }
+      }
+      if (any) { out.push(obj); }
+    }
+    return out;
+  }
+  function csvToObjects(text) { return rowsToObjects(parseCSV(text)); }
+  function settingsFrom(objs) {
+    var s = {};
+    (objs || []).forEach(function (o) { var k = norm(o.key || o.setting || o.name); if (k) { s[k] = o.value == null ? '' : String(o.value).trim(); } });
+    return s;
+  }
+
+  /* "7:50", "7:50 AM", "13:44", "1:44 PM", "7:50:00 AM". Bare hours below 6 are read as afternoon. */
+  function toMinutes(str) {
+    if (str == null) { return null; }
+    var s = String(str).trim().toLowerCase(); if (!s) { return null; }
+    var m = s.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/);
+    if (!m) { return null; }
+    var h = parseInt(m[1], 10), mi = parseInt(m[2] || '0', 10), ap = m[4];
+    if (h > 23 || mi > 59) { return null; }
+    if (ap) { ap = ap.charAt(0); if (ap === 'p' && h < 12) { h += 12; } if (ap === 'a' && h === 12) { h = 0; } }
+    else if (h < 6) { h += 12; }
+    return h * 60 + mi;
+  }
+  function fmtMinutes(min) {
+    var h = Math.floor(min / 60), m = Math.floor(min % 60), ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) { h = 12; }
+    return h + ':' + pad(m) + ' ' + ap;
+  }
+  /* Accepts 2026-08-27, 8/27/2026, 8/27/26, or anything Date can parse. Returns YYYY-MM-DD or null. */
+  function parseDate(str) {
+    if (!str) { return null; }
+    var s = String(str).trim(), m, y, d;
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) { return m[1] + '-' + pad(m[2]) + '-' + pad(m[3]); }
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) { y = m[3].length === 2 ? '20' + m[3] : m[3]; return y + '-' + pad(m[1]) + '-' + pad(m[2]); }
+    d = new Date(s); if (!isNaN(d.getTime())) { return ymd(d); }
+    return null;
+  }
+
+  var DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+  function dayTypeFor(d, dayTypes, settings) {
+    var key = ymd(d), i, row;
+    for (i = 0; i < (dayTypes || []).length; i++) {
+      row = dayTypes[i];
+      if (parseDate(row.date) === key) { return { type: row.day_type || row.type || '', note: row.note || '', explicit: true }; }
+    }
+    /* Weekday rows: a day name in the Date column (e.g. "Wednesday") applies every week; exact dates above override. */
+    var dname = DAYS[d.getDay()];
+    for (i = 0; i < (dayTypes || []).length; i++) {
+      row = dayTypes[i];
+      if (norm(row.date).slice(0, 3) === dname) { return { type: row.day_type || row.type || '', note: row.note || '', explicit: true }; }
+    }
+    var dow = d.getDay();
+    if (dow === 0 || dow === 6) { return { type: '', note: '', explicit: false }; }
+    return { type: (settings && settings.default_day_type) || 'Regular', note: '', explicit: false };
+  }
+  function periodsFor(dayType, bell) {
+    var t = norm(dayType); if (!t) { return []; }
+    return (bell || []).filter(function (b) { return norm(b.day_type || b.type) === t; })
+      .map(function (b) {
+        return { period: String(b.period == null ? '' : b.period).trim(), label: b.label || ('Period ' + b.period), start: toMinutes(b.start), end: toMinutes(b.end) };
+      })
+      .filter(function (p) { return p.period && p.start != null && p.end != null && p.end > p.start; })
+      .sort(function (a, b) { return a.start - b.start; });
+  }
+  function currentPeriod(nowMin, periods) {
+    var i, p;
+    for (i = 0; i < periods.length; i++) {
+      p = periods[i];
+      if (nowMin >= p.start && nowMin < p.end) {
+        return { period: p.period, label: p.label, start: p.start, end: p.end, elapsed: nowMin - p.start, remaining: p.end - nowMin, length: p.end - p.start };
+      }
+    }
+    return null;
+  }
+  function nextPeriod(nowMin, periods) {
+    var i;
+    for (i = 0; i < periods.length; i++) { if (periods[i].start > nowMin) { return periods[i]; } }
+    return null;
+  }
+  /* Rooms rows: room, period, course, [course_title], [teacher], [day_type]. A day_type-specific row wins over a generic one. */
+  function courseFor(room, period, rooms, dayType) {
+    var r = norm(room), p = String(period).trim(), dt = norm(dayType), generic = null, i, row, rdt;
+    for (i = 0; i < (rooms || []).length; i++) {
+      row = rooms[i];
+      if (norm(row.room) !== r) { continue; }
+      if (String(row.period == null ? '' : row.period).trim() !== p) { continue; }
+      rdt = norm(row.day_type);
+      if (rdt && rdt === dt) { return row; }
+      if (!rdt && !generic) { generic = row; }
+    }
+    return generic;
+  }
+  /* Course tab rows: unit, starts, learning_target_s, success_criteria, [current], [notes]. */
+  function currentUnit(units, d) {
+    var today = ymd(d), forced = [], best = null, bestStart = null;
+    (units || []).forEach(function (u) {
+      if (/^(x|yes|true|1|now)$/i.test(String(u.current == null ? '' : u.current).trim())) { forced.push(u); }
+    });
+    if (forced.length) { return forced[forced.length - 1]; }
+    (units || []).forEach(function (u) {
+      var s = parseDate(u.starts || u.start || u.start_date || u.date);
+      if (!s || s > today) { return; }
+      if (!best || s >= bestStart) { best = u; bestStart = s; }
+    });
+    return best;
+  }
+  function field(obj, names) {
+    var i, k;
+    for (i = 0; i < names.length; i++) { k = norm(names[i]); if (obj && obj[k]) { return obj[k]; } }
+    return '';
+  }
+  /* Split a cell into display lines: newlines or " | " separators; strip leading bullets. */
+  function lines(text) {
+    return String(text == null ? '' : text).split(/\r?\n|\s*\|\s*/).map(function (t) { return t.replace(/^[\-\u2022\*]\s*/, '').trim(); }).filter(Boolean);
+  }
+  function inVideoWindow(d, settings) {
+    settings = settings || {};
+    var days = String(settings.video_days || 'mon,tue,wed,thu,fri').toLowerCase();
+    if (days.indexOf(DAYS[d.getDay()]) < 0) { return false; }
+    var s = toMinutes(settings.video_start), e = toMinutes(settings.video_end);
+    if (s == null || e == null) { return false; }
+    var now = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    return now >= s && now < e;
+  }
+  function courseUnits(courses, name) {
+    if (!courses) { return []; }
+    if (courses[name]) { return courses[name]; }
+    var want = norm(name), k;
+    for (k in courses) { if (courses.hasOwnProperty(k) && norm(k) === want) { return courses[k]; } }
+    return [];
+  }
+
+  /* The one decision the page needs: what to show right now for this room. */
+  function decide(d, data, room) {
+    data = data || {}; var settings = data.settings || {};
+    var dt = dayTypeFor(d, data.daytypes, settings);
+    var periods = periodsFor(dt.type, data.bell);
+    var nowMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    var cur = currentPeriod(nowMin, periods), nxt = nextPeriod(nowMin, periods);
+    var res = { mode: 'deck', dayType: dt.type, dayNote: dt.note, period: cur, next: nxt, periods: periods, course: null, unit: null, reason: '' };
+    if (inVideoWindow(d, settings)) { res.mode = 'video'; res.reason = 'video window'; return res; }
+    if (!cur) { res.reason = dt.type ? 'between periods' : 'no school day'; return res; }
+    var courseRow = courseFor(room, cur.period, data.rooms, dt.type);
+    if (!courseRow || !courseRow.course) { res.reason = 'no course mapped for ' + room + ' period ' + cur.period; return res; }
+    res.course = courseRow;
+    var unit = currentUnit(courseUnits(data.courses, courseRow.course), d);
+    if (!unit) { res.reason = 'no current unit for ' + courseRow.course; return res; }
+    res.unit = unit;
+    var tm = parseFloat(settings.targets_minutes); if (isNaN(tm)) { tm = 8; }
+    var tail = parseFloat(settings.targets_last_minutes); if (isNaN(tail)) { tail = 0; }
+    /* If the video window overlaps the start of this period, the targets timer starts when the video ends. */
+    var from = cur.start, vs = toMinutes(settings.video_start), ve = toMinutes(settings.video_end);
+    var days = String(settings.video_days || 'mon,tue,wed,thu,fri').toLowerCase();
+    if (vs != null && ve != null && days.indexOf(DAYS[d.getDay()]) >= 0 && vs < cur.end && ve > cur.start) { from = Math.max(cur.start, ve); }
+    res.targetsFrom = from;
+    if (tm <= 0 || (nowMin >= from && nowMin - from < tm)) { res.mode = 'targets'; res.reason = 'period start'; }
+    else if (tail > 0 && cur.remaining <= tail) { res.mode = 'targets'; res.reason = 'period end'; }
+    else { res.reason = 'targets window over'; }
+    return res;
+  }
+
+  root.SignageEngine = {
+    norm: norm, pad: pad, ymd: ymd, parseCSV: parseCSV, csvToObjects: csvToObjects, settingsFrom: settingsFrom,
+    toMinutes: toMinutes, fmtMinutes: fmtMinutes, parseDate: parseDate, dayTypeFor: dayTypeFor, periodsFor: periodsFor,
+    currentPeriod: currentPeriod, nextPeriod: nextPeriod, courseFor: courseFor, currentUnit: currentUnit, field: field,
+    lines: lines, inVideoWindow: inVideoWindow, courseUnits: courseUnits, decide: decide
+  };
+})(typeof window !== 'undefined' ? window : module.exports);
+
+</script>
+<script>
+window.SIGNAGE_SEED = {
+ "settings": [
+  [
+   "school_name",
+   "Edwardsville High School",
+   "Shown in the footer of the targets card."
+  ],
+  [
+   "default_day_type",
+   "Regular",
+   "Bell schedule used on any weekday not listed in DayTypes."
+  ],
+  [
+   "targets_minutes",
+   "8",
+   "How many minutes after the bell the targets card stays up before the announcements deck returns. 0 = the whole period."
+  ],
+  [
+   "targets_last_minutes",
+   "0",
+   "Optional: bring the targets card back for the last N minutes of each period (exit-ticket reminder). 0 = off."
+  ],
+  [
+   "refresh_seconds",
+   "60",
+   "How often screens re-read this sheet. Teacher edits appear within this window."
+  ],
+  [
+   "deck_url",
+   "",
+   "Google Slides: File > Share > Publish to web > Embed, then paste the src URL here. The office owns this deck."
+  ],
+  [
+   "deck_delay_ms",
+   "8000",
+   "Seconds per slide, in milliseconds (8000 = 8 s)."
+  ],
+  [
+   "video_channel_id",
+   "",
+   "YouTube channel ID (starts with UC...). The page embeds whatever that channel is streaming live."
+  ],
+  [
+   "video_url",
+   "",
+   "Optional: a specific YouTube embed URL that overrides the channel's live stream."
+  ],
+  [
+   "video_days",
+   "Mon,Tue,Wed,Thu,Fri",
+   "Days the video window applies."
+  ],
+  [
+   "video_start",
+   "7:15 AM",
+   "Start of the live announcements window (default: start of 1st hour)."
+  ],
+  [
+   "video_end",
+   "7:25 AM",
+   "End of the live announcements window."
+  ],
+  [
+   "broadcast",
+   "",
+   "Type a message here and every idle screen shows it within one refresh. Clear the cell to remove it."
+  ],
+  [
+   "broadcast_style",
+   "notice",
+   "notice = banner along the bottom; urgent = full screen."
+  ],
+  [
+   "heartbeat_url",
+   "",
+   "Optional Apps Script web app URL. Screens check in every 5 minutes so you can see which rooms are live."
+  ]
+ ],
+ "bell": [
+  [
+   "Regular",
+   "0",
+   "Zero Hour",
+   "6:25 AM",
+   "7:10 AM",
+   "Real EHS bell (Mon, Tue, Thu, Fri)."
+  ],
+  [
+   "Regular",
+   "1",
+   "1st Hour",
+   "7:15 AM",
+   "8:15 AM",
+   ""
+  ],
+  [
+   "Regular",
+   "2",
+   "2nd Hour",
+   "8:21 AM",
+   "9:15 AM",
+   ""
+  ],
+  [
+   "Regular",
+   "3",
+   "3rd Hour",
+   "9:21 AM",
+   "10:15 AM",
+   ""
+  ],
+  [
+   "Regular",
+   "4",
+   "4th Hour",
+   "10:21 AM",
+   "11:45 AM",
+   "Lunch waves A-D run inside 4th hour; shown as one period."
+  ],
+  [
+   "Regular",
+   "5",
+   "5th Hour",
+   "11:51 AM",
+   "12:45 PM",
+   ""
+  ],
+  [
+   "Regular",
+   "6",
+   "6th Hour",
+   "12:51 PM",
+   "1:45 PM",
+   ""
+  ],
+  [
+   "Wednesday",
+   "0",
+   "Zero Hour",
+   "6:25 AM",
+   "7:10 AM",
+   "Wednesday bell."
+  ],
+  [
+   "Wednesday",
+   "1",
+   "1st Hour",
+   "7:15 AM",
+   "8:05 AM",
+   ""
+  ],
+  [
+   "Wednesday",
+   "2",
+   "2nd Hour",
+   "8:11 AM",
+   "8:55 AM",
+   ""
+  ],
+  [
+   "Wednesday",
+   "3",
+   "3rd Hour",
+   "9:01 AM",
+   "9:45 AM",
+   ""
+  ],
+  [
+   "Wednesday",
+   "4",
+   "4th Hour",
+   "9:51 AM",
+   "10:35 AM",
+   ""
+  ],
+  [
+   "Wednesday",
+   "5",
+   "5th Hour",
+   "10:41 AM",
+   "11:55 AM",
+   "Lunch waves A-D run inside 5th hour; shown as one period."
+  ],
+  [
+   "Wednesday",
+   "6",
+   "6th Hour",
+   "12:01 PM",
+   "12:45 PM",
+   ""
+  ]
+ ],
+ "daytypes": [
+  [
+   "Wednesday",
+   "Wednesday",
+   "Runs the Wednesday bell every week. A weekday name in the Date column repeats weekly; exact dates override."
+  ],
+  [
+   "2026-09-07",
+   "No School",
+   "Labor Day (example row: a day type with no Bell rows means announcements only)"
+  ]
+ ],
+ "rooms": [
+  [
+   "A116",
+   "0",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "1",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "2",
+   "Consumer Education",
+   "Consumer Education",
+   "J. Walker",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "3",
+   "Business & Economics",
+   "Business & Economics",
+   "J. Walker",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "4",
+   "Consumer Education",
+   "Consumer Education",
+   "J. Walker",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "5",
+   "Principles of Law",
+   "Principles of Law",
+   "J. Walker",
+   "",
+   ""
+  ],
+  [
+   "A116",
+   "6",
+   "Consumer Education",
+   "Consumer Education",
+   "J. Walker",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "0",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "1",
+   "Dell Tech Support 1",
+   "Dell Tech Support 1",
+   "D. Schickedanz",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "2",
+   "PC Repair & Maintenance",
+   "PC Repair & Maintenance",
+   "D. Schickedanz",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "3",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "4",
+   "AP Cybersecurity",
+   "AP Cybersecurity",
+   "D. Schickedanz",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "5",
+   "PC Repair & Maintenance",
+   "PC Repair & Maintenance",
+   "D. Schickedanz",
+   "",
+   ""
+  ],
+  [
+   "A122",
+   "6",
+   "PC Repair & Maintenance",
+   "PC Repair & Maintenance",
+   "D. Schickedanz",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "0",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "1",
+   "Business & Economics",
+   "Business & Economics",
+   "W. McAnulty",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "2",
+   "Accounting 1",
+   "Accounting 1",
+   "W. McAnulty",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "3",
+   "Accounting 1",
+   "Accounting 1",
+   "W. McAnulty",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "4",
+   "Business & Economics",
+   "Business & Economics",
+   "W. McAnulty",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "5",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A123",
+   "6",
+   "Business & Economics",
+   "Business & Economics",
+   "W. McAnulty",
+   "",
+   ""
+  ],
+  [
+   "A124",
+   "0",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A124",
+   "1",
+   "AP Microeconomics",
+   "AP Microeconomics",
+   "A. Koester",
+   "",
+   ""
+  ],
+  [
+   "A124",
+   "2",
+   "",
+   "",
+   "",
+   "",
+   "Prep (fall) - confirmed"
+  ],
+  [
+   "A124",
+   "3",
+   "AP Macroeconomics",
+   "AP Macroeconomics",
+   "A. Koester",
+   "",
+   ""
+  ],
+  [
+   "A124",
+   "4",
+   "Keyboarding & Document Formatting",
+   "Keyboarding & Document Formatting",
+   "A. Koester",
+   "",
+   ""
+  ],
+  [
+   "A124",
+   "5",
+   "",
+   "",
+   "",
+   "",
+   "Prep (fall) - confirmed"
+  ],
+  [
+   "A124",
+   "6",
+   "Keyboarding & Document Formatting",
+   "Keyboarding & Document Formatting",
+   "A. Koester",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "0",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "1",
+   "AP Computer Science A PLTW",
+   "AP Computer Science A PLTW",
+   "R. Wilkinson",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "2",
+   "Consumer Education",
+   "Consumer Education",
+   "R. Wilkinson",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "3",
+   "AP Computer Science Principles PLTW",
+   "AP Computer Science Principles PLTW",
+   "R. Wilkinson",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "4",
+   "Computer Science Essentials PLTW",
+   "Computer Science Essentials PLTW",
+   "R. Wilkinson",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "5",
+   "Consumer Education",
+   "Consumer Education",
+   "R. Wilkinson",
+   "",
+   ""
+  ],
+  [
+   "A125",
+   "6",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "0",
+   "Early Bird Consumer Education",
+   "Early Bird Consumer Education",
+   "S. Laurent-Smith",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "1",
+   "Honors Business Management",
+   "Honors Business Management",
+   "S. Laurent-Smith",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "2",
+   "Consumer Education",
+   "Consumer Education",
+   "S. Laurent-Smith",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "3",
+   "Consumer Education",
+   "Consumer Education",
+   "S. Laurent-Smith",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "4",
+   "Computer Concepts & Software Applications",
+   "Computer Concepts & Software Applications",
+   "S. Laurent-Smith",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "5",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ],
+  [
+   "A210",
+   "6",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ]
+ ],
+ "courses": {
+  "AP Macroeconomics": [
+   [
+    "Unit 1: Basic Economic Concepts",
+    "2026-08-17",
+    "I can explain how scarcity forces individuals and societies to make choices, and identify the opportunity cost of a decision.\nI can use a production possibilities curve to show efficiency, growth, and trade-offs.\nI can determine comparative advantage and explain why trade benefits both parties.",
+    "Calculate opportunity cost from a table or a PPC.\nIdentify which producer has the comparative advantage and state terms of trade that benefit both.\nPredict how a change in demand or supply shifts equilibrium price and quantity.",
+    "",
+    "Draft wording: edit freely. Dates are placeholders."
+   ],
+   [
+    "Unit 2: Economic Indicators and the Business Cycle",
+    "2026-09-21",
+    "I can explain how GDP is measured and why real GDP is compared across years instead of nominal GDP.\nI can calculate unemployment and inflation rates and explain what each does and does not capture.\nI can describe the phases of the business cycle using output and employment.",
+    "Compute real GDP, the GDP deflator, and a growth rate from given data.\nClassify a person as employed, unemployed, or not in the labor force.\nUse CPI to calculate an inflation rate and convert a nominal value to real.",
+    "",
+    ""
+   ],
+   [
+    "Unit 3: National Income and Price Determination",
+    "2026-10-26",
+    "I can model the economy with aggregate demand and aggregate supply and predict how a shock moves output and the price level.\nI can explain how the spending multiplier and the tax multiplier magnify a change in spending.\nI can evaluate fiscal policy choices for closing an output gap.",
+    "Draw a correctly labeled AD-AS graph showing a recessionary or inflationary gap.\nCalculate the spending multiplier from the marginal propensity to consume.\nRecommend a fiscal policy for a given gap and show its effect on the graph.",
+    "",
+    ""
+   ],
+   [
+    "Unit 4: Financial Sector",
+    "2026-12-07",
+    "I can explain the functions of money and how banks create money through lending.\nI can use the money market and the loanable funds market to show how interest rates are determined.\nI can explain how the central bank uses its tools to move interest rates and output.",
+    "Calculate the money multiplier and the maximum change in the money supply from a new deposit.\nGraph the effect of expansionary or contractionary monetary policy on the money market.\nExplain the effect of a change in interest rates on investment and aggregate demand.",
+    "",
+    ""
+   ],
+   [
+    "Unit 5: Long-Run Consequences of Stabilization Policies",
+    "2027-01-25",
+    "I can explain the short-run and long-run Phillips curves and what shifts them.\nI can connect money growth to inflation in the long run.\nI can analyze how deficits and debt affect interest rates and investment through crowding out.",
+    "Draw the short-run and long-run Phillips curves and show the effect of a demand shock.\nExplain the quantity theory of money with the equation of exchange.\nShow crowding out on a loanable funds graph and explain the effect on long-run growth.",
+    "",
+    ""
+   ],
+   [
+    "Unit 6: Open Economy: International Trade and Finance",
+    "2027-03-08",
+    "I can explain how the balance of payments accounts record trade and financial flows.\nI can use the foreign exchange market to predict how a currency appreciates or depreciates.\nI can analyze how exchange rate changes affect net exports and aggregate demand.",
+    "Classify a transaction into the current account or the financial account.\nGraph a change in demand for a currency and identify the new exchange rate.\nExplain how a change in interest rates causes capital flows and moves the exchange rate.",
+    "",
+    ""
+   ]
+  ],
+  "AP Microeconomics": [
+   [
+    "Unit 1: Basic Economic Concepts",
+    "2026-08-17",
+    "I can explain scarcity, opportunity cost, and how a production possibilities curve shows trade-offs.\nI can determine comparative advantage and the gains from trade.",
+    "Calculate opportunity cost from a PPC or a table.\nIdentify the range of terms of trade that benefits both parties.\nUse marginal analysis to find the quantity where marginal benefit equals marginal cost.",
+    "",
+    "Draft wording: edit freely. Dates are placeholders."
+   ],
+   [
+    "Unit 2: Supply and Demand",
+    "2026-09-14",
+    "I can explain what shifts demand and supply and predict the new equilibrium.\nI can calculate elasticity and explain what it tells a producer about revenue.\nI can show how a tax, a price ceiling, or a price floor changes surplus and creates deadweight loss.",
+    "Compute price elasticity of demand with the midpoint method.\nGraph a per-unit tax and identify who bears more of it.\nIdentify consumer surplus, producer surplus, and deadweight loss on a graph.",
+    "",
+    ""
+   ]
+  ],
+  "Multimedia Presentations": [
+   [
+    "Unit 1: Visual Hierarchy and Layout",
+    "2026-08-17",
+    "I can apply contrast, alignment, repetition, and proximity so a slide can be read from across a room.\nI can choose type sizes and color pairings that stay legible on a projector.",
+    "Build a five-slide deck with one idea per slide.\nUse a type size readable from 20 feet and explain why.\nJustify each design decision in one sentence.",
+    "",
+    "Draft wording: edit freely. Dates are placeholders."
+   ],
+   [
+    "Unit 2: Images, Formats, and Compression",
+    "2026-09-14",
+    "I can choose the right image format for the job and explain the trade-off between quality and file size.\nI can edit, crop, and export an image for screen and for print.",
+    "Export the same image as PNG, JPEG, and SVG and state when each is appropriate.\nCrop and resize an image to a target dimension without distortion.\nKeep a slide deck under a stated file size without visible quality loss.",
+    "",
+    ""
+   ]
+  ],
+  "Keyboarding & Document Formatting": [
+   [
+    "Unit 1: Home Row and Touch Technique",
+    "2026-08-17",
+    "I can type with correct finger placement without looking at the keys.\nI can maintain posture and hand position that prevent strain.",
+    "Type 20 words per minute at 95% accuracy on a three-minute timing.\nKeep eyes on the copy for the full timing.\nSelf-check posture against the checklist before each timing.",
+    "",
+    "Draft wording: edit freely. Dates are placeholders."
+   ],
+   [
+    "Unit 2: Business Letters and Memos",
+    "2026-09-21",
+    "I can format a block-style business letter and a memo to professional standards.\nI can proofread for spacing, capitalization, and punctuation errors.",
+    "Produce a block letter with every element placed correctly.\nProduce a memo with a correct heading block.\nFind and fix all errors in a provided draft.",
+    "",
+    ""
+   ]
+  ]
+ }
+};
+</script>
+<script>
+(function () {
+  /* ============ CONFIG: the only part IT edits ============ */
+  var CONFIG = {
+    sheetId: '',        /* Usually set once in config.js instead of here. Blank = built-in demo data. */
+    jsonUrl: '',        /* Optional: Apps Script web app returning the same data as JSON (see README). */
+    defaultRoom: '',    /* Blank = each screen picks (and remembers) its own room on first open. */
+    dataUrl: '',        /* Compiled pipeline: path to the nightly data.json. Blank = try 'data.json' beside this page. */
+    tabs: { settings: 'Settings', bell: 'Bell', daytypes: 'DayTypes', rooms: 'Rooms' }
+  };
+  /* Site-wide values from config.js (if present) override the block above. */
+  try {
+    if (window.EHS_CONFIG) {
+      var _ck;
+      for (_ck in window.EHS_CONFIG) { if (window.EHS_CONFIG[_ck]) { CONFIG[_ck] = window.EHS_CONFIG[_ck]; } }
+    }
+  } catch (e) {}
+  /* ======================================================== */
+
+  var E = window.SignageEngine;
+  var qs = {};
+  window.location.search.replace(/^\?/, '').split('&').forEach(function (kv) {
+    if (!kv) { return; } var p = kv.split('='); qs[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || '').replace(/\+/g, ' '));
+  });
+  if (qs.sheet) { CONFIG.sheetId = qs.sheet; }
+  if (qs.json) { CONFIG.jsonUrl = qs.json; }
+  function savedRoom() { try { return window.localStorage.getItem('ehs_room') || ''; } catch (e) { return ''; } }
+  function saveRoom(r) { try { window.localStorage.setItem('ehs_room', r); } catch (e) {} }
+  /* ?room= previews a room without changing this screen's memory; only the picker saves. */
+  var room = qs.room || savedRoom() || CONFIG.defaultRoom;
+  var demo = qs.demo === '1';
+  var timeOffset = 0;
+  if (qs.t) { var sim = new Date(qs.t); if (!isNaN(sim.getTime())) { timeOffset = sim.getTime() - Date.now(); } }
+  function now() { return new Date(Date.now() + timeOffset); }
+
+  var data = null, lastGood = 0, last = { key: '' }, deckUrlLoaded = '', refreshMs = 60000, refreshTimer = null;
+
+  /* ---- data: demo seed, Google Sheet CSV, or JSON endpoint ---- */
+  function seedToData(seed) {
+    var d = { settings: {}, bell: [], daytypes: [], rooms: [], courses: {} };
+    seed.settings.forEach(function (r) { d.settings[r[0]] = r[1]; });
+    d.bell = seed.bell.map(function (r) { return { day_type: r[0], period: r[1], label: r[2], start: r[3], end: r[4] }; });
+    d.daytypes = seed.daytypes.map(function (r) { return { date: r[0], day_type: r[1], note: r[2] }; });
+    d.rooms = seed.rooms.map(function (r) { return { room: r[0], period: r[1], course: r[2], course_title: r[3], teacher: r[4], day_type: r[5] }; });
+    Object.keys(seed.courses).forEach(function (k) {
+      d.courses[k] = seed.courses[k].map(function (r) { return { unit: r[0], starts: r[1], learning_target_s: r[2], success_criteria: r[3], current: r[4], notes: r[5] }; });
+    });
+    return d;
+  }
+  function gvizUrl(tab, sid) {
+    return 'https://docs.google.com/spreadsheets/d/' + (sid || CONFIG.sheetId) + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab) + '&_=' + Date.now();
+  }
+  function fetchText(url) {
+    return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.text(); });
+  }
+  function loadFromSheet() {
+    var t = CONFIG.tabs;
+    return Promise.all([fetchText(gvizUrl(t.settings)), fetchText(gvizUrl(t.bell)), fetchText(gvizUrl(t.daytypes)), fetchText(gvizUrl(t.rooms))])
+      .then(function (res) {
+        var d = { settings: E.settingsFrom(E.csvToObjects(res[0])), bell: E.csvToObjects(res[1]), daytypes: E.csvToObjects(res[2]), rooms: E.csvToObjects(res[3]), courses: {} };
+        var names = {};
+        d.rooms.forEach(function (r) {
+          if (E.norm(r.room) === E.norm(room) && r.course) {
+            /* Optional federation: a course tab can live in a teacher-owned spreadsheet (Source sheet ID column). */
+            if (!(r.course in names) || (!names[r.course] && r.source_sheet_id)) { names[r.course] = r.source_sheet_id || ''; }
+          }
+        });
+        return Promise.all(Object.keys(names).map(function (n) {
+          return fetchText(gvizUrl(n, names[n])).then(function (txt) { d.courses[n] = E.csvToObjects(txt); }, function () { d.courses[n] = []; });
+        })).then(function () { return d; });
+      });
+  }
+  function loadFromDataUrl() {
+    var u = (CONFIG.dataUrl || 'data.json') + '?_=' + Date.now();
+    return fetchText(u).then(function (txt) { return JSON.parse(txt); });
+  }
+  function loadFromJson() {
+    var url = CONFIG.jsonUrl + (CONFIG.jsonUrl.indexOf('?') < 0 ? '?' : '&') + 'room=' + encodeURIComponent(room) + '&_=' + Date.now();
+    return fetchText(url).then(function (txt) { return JSON.parse(txt); });
+  }
+  function load() {
+    var p;
+    if (demo) { p = Promise.resolve(seedToData(window.SIGNAGE_SEED)); }
+    else if (CONFIG.jsonUrl) { p = loadFromJson(); }
+    else if (CONFIG.sheetId) { p = loadFromSheet(); }
+    else { p = loadFromDataUrl().catch(function () { return seedToData(window.SIGNAGE_SEED); }); }
+    return p.then(function (d) {
+      var keep = data && demo ? data.settings : null;
+      data = d;
+      if (keep) { if (keep.broadcast) { data.settings.broadcast = keep.broadcast; } }
+      lastGood = Date.now();
+      var rs = parseFloat(data.settings.refresh_seconds); refreshMs = (!isNaN(rs) && rs >= 15 ? rs : 60) * 1000;
+      setStatus();
+      last.key = ''; tick();
+    }, function () {
+      if (!data) { data = seedToData(window.SIGNAGE_SEED); data._fallback = true; last.key = ''; tick(); }
+      setStatus();
+    }).then(function () {
+      clearTimeout(refreshTimer); refreshTimer = setTimeout(load, refreshMs + Math.random() * 15000); /* jitter: a building of screens never refreshes in lockstep */
+    });
+  }
+  function setStatus() {
+    var el = document.getElementById('status');
+    el.className = (!data || data._fallback) ? 'down' : (Date.now() - lastGood > refreshMs * 3 ? 'stale' : '');
+  }
+
+  /* ---- rendering ---- */
+  function $(id) { return document.getElementById(id); }
+  function text(id, s) { $(id).textContent = s == null ? '' : s; }
+  function fmtClock(d) { var h = d.getHours(), m = d.getMinutes(), ap = h >= 12 ? 'PM' : 'AM'; h = h % 12; if (h === 0) { h = 12; } return h + ':' + E.pad(m) + ' ' + ap; }
+  var DAYNAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function fmtDate(d) { return DAYNAMES[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate(); }
+  function fillList(id, items, base) {
+    var ul = $(id); ul.innerHTML = '';
+    items.forEach(function (s) { var li = document.createElement('li'); li.textContent = s; ul.appendChild(li); });
+    var chars = items.join('').length, level = items.length + (chars > 260 ? 1 : 0) + (chars > 420 ? 1 : 0);
+    ul.className = base + (level >= 5 ? ' n5' : level === 4 ? ' n4' : level === 3 ? ' n3' : '');
+    if (!items.length) { var li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Not published yet'; ul.appendChild(li); }
+  }
+  function show(mode) {
+    ['targets', 'deck', 'video'].forEach(function (m) {
+      var el = $(m);
+      if (m === mode) { el.hidden = false; setTimeout(function () { el.classList.add('active'); }, 20); }
+      else { el.classList.remove('active'); el.hidden = true; }
+    });
+    $('chip').hidden = (mode === 'targets');
+  }
+  function placeholder(frame, big, small) {
+    frame.innerHTML = '<div class="placeholder"><div class="big">' + big + '</div><div class="small">' + small + '</div></div>';
+  }
+  function deckSrc(url, delay) {
+    if (!url) { return ''; }
+    var base = url.split('?')[0].replace(/\/pub$/, '/embed');
+    return base + '?start=true&loop=true&delayms=' + delay + '&rm=minimal';
+  }
+  function ensureDeck() {
+    var frame = $('deck-frame'), s = data.settings, url = deckSrc(s.deck_url, parseInt(s.deck_delay_ms, 10) || 8000);
+    if (demo || !url) {
+      if (deckUrlLoaded !== 'placeholder') { placeholder(frame, 'Announcements deck', demo ? 'The office\u2019s Google Slides deck plays here, full screen, on a loop.' : 'Add the published Slides embed URL to Settings \u203a deck_url.'); deckUrlLoaded = 'placeholder'; }
+      return;
+    }
+    if (deckUrlLoaded !== url) {
+      frame.innerHTML = '';
+      var f = document.createElement('iframe'); f.src = url; f.setAttribute('allow', 'autoplay'); f.setAttribute('title', 'Announcements'); frame.appendChild(f);
+      deckUrlLoaded = url;
+    }
+  }
+  function ensureVideo(on) {
+    var frame = $('video-frame'), s = data.settings;
+    if (!on) { frame.innerHTML = ''; frame.setAttribute('data-src', ''); return; }
+    var url = s.video_url || (s.video_channel_id ? 'https://www.youtube.com/embed/live_stream?channel=' + encodeURIComponent(s.video_channel_id) + '&autoplay=1&rel=0&modestbranding=1' : '');
+    if (demo || !url) { if (frame.getAttribute('data-src') !== 'placeholder') { placeholder(frame, 'Live announcements', demo ? 'The YouTube live stream plays here with sound during the first-hour window.' : 'Add the channel ID to Settings \u203a video_channel_id.'); frame.setAttribute('data-src', 'placeholder'); } return; }
+    if (frame.getAttribute('data-src') !== url) {
+      frame.innerHTML = '';
+      var f = document.createElement('iframe'); f.src = url; f.setAttribute('allow', 'autoplay; encrypted-media'); f.setAttribute('title', 'Live announcements'); frame.appendChild(f);
+      frame.setAttribute('data-src', url);
+    }
+  }
+  function renderBanner() {
+    var b = $('banner'), msg = (data && data.settings.broadcast) || '';
+    if (!msg) { b.hidden = true; return; }
+    b.textContent = msg; b.className = String(data.settings.broadcast_style || '').toLowerCase() === 'urgent' ? 'urgent' : ''; b.hidden = false;
+  }
+  function renderBar(dec, d) {
+    var bar = $('bar');
+    if (!dec.period) { bar.hidden = true; return; }
+    bar.hidden = false;
+    var pct = Math.max(0, Math.min(100, dec.period.elapsed / dec.period.length * 100));
+    $('barfill').style.width = pct + '%';
+    var mark = $('barmark'), tm = parseFloat(data.settings.targets_minutes); if (isNaN(tm)) { tm = 8; }
+    if (tm > 0 && dec.targetsFrom != null) { mark.style.display = 'block'; mark.style.left = Math.min(100, (dec.targetsFrom + tm - dec.period.start) / dec.period.length * 100) + '%'; }
+    else { mark.style.display = 'none'; }
+  }
+  function render(dec, d) {
+    var s = data.settings;
+    if (dec.mode === 'targets') {
+      var c = dec.course, u = dec.unit;
+      text('t-course', c.course_title || c.course); text('t-period', dec.period.label);
+      text('t-unit', E.field(u, ['unit', 'chapter_unit', 'title']));
+      fillList('t-lt', E.lines(E.field(u, ['learning_target_s', 'learning_targets', 'learning_target', 'targets', 'lt'])), 'lt');
+      fillList('t-sc', E.lines(E.field(u, ['success_criteria', 'criteria', 'sc'])), 'sc');
+      text('t-date', fmtDate(d)); text('t-school', s.school_name || ''); text('t-room', room);
+      ensureVideo(false);
+    } else if (dec.mode === 'video') {
+      ensureVideo(true);
+    } else {
+      ensureDeck(); ensureVideo(false);
+    }
+    show(dec.mode);
+  }
+  function renderChip(dec, d) {
+    text('c-clock', fmtClock(d));
+    var n = $('c-next');
+    if (dec.period) { n.innerHTML = '<b>' + escapeHtml(dec.period.label) + '</b> \u00b7 ends ' + E.fmtMinutes(dec.period.end); }
+    else if (dec.next) { n.innerHTML = 'Next <b>' + escapeHtml(dec.next.label) + '</b> \u00b7 ' + E.fmtMinutes(dec.next.start); }
+    else { n.textContent = ''; }
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  function tick() {
+    var d = now();
+    text('t-clock', fmtClock(d));
+    if (!data) { return; }
+    var dec = E.decide(d, data, room);
+    var key = [dec.mode, dec.period ? dec.period.period : '', dec.course ? dec.course.course : '', dec.unit ? E.field(dec.unit, ['unit']) : '', dec.dayType].join('|');
+    if (key !== last.key) { render(dec, d); last.key = key; }
+    renderChip(dec, d); renderBar(dec, d); renderBanner(); setStatus();
+    if (demo) { text('d-read', dec.mode.toUpperCase() + ' \u00b7 ' + dec.reason + ' \u00b7 ' + (dec.dayType || 'no school') + (dec.period ? ' \u00b7 ' + dec.period.label + ' (' + Math.floor(dec.period.elapsed) + ' min in)' : '')); }
+  }
+
+  /* ---- heartbeat: lets a status sheet show which rooms are live ---- */
+  function heartbeat() {
+    if (!data || !data.settings.heartbeat_url || demo) { return; }
+    var dec = E.decide(now(), data, room);
+    var url = data.settings.heartbeat_url + (data.settings.heartbeat_url.indexOf('?') < 0 ? '?' : '&') +
+      'room=' + encodeURIComponent(room) + '&mode=' + dec.mode + '&period=' + encodeURIComponent(dec.period ? dec.period.label : '') +
+      '&course=' + encodeURIComponent(dec.course ? dec.course.course : '') + '&reason=' + encodeURIComponent(dec.reason);
+    try { fetch(url, { mode: 'no-cors', cache: 'no-store' }).catch(function () {}); } catch (e) {}
+  }
+
+  /* ---- demo controls ---- */
+  function setupDemo() {
+    if (!demo) { return; }
+    document.body.classList.add('demo');
+    var panel = $('demo'); panel.hidden = false;
+    var sel = $('d-room'), rooms = {};
+    (window.SIGNAGE_SEED.rooms || []).forEach(function (r) { rooms[r[0]] = true; });
+    Object.keys(rooms).forEach(function (r) { var o = document.createElement('option'); o.value = r; o.textContent = r; sel.appendChild(o); });
+    sel.value = room;
+    sel.onchange = function () { room = sel.value; last.key = ''; tick(); };
+    var buttons = panel.querySelectorAll('button[data-t]');
+    function clearOn() { for (var i = 0; i < buttons.length; i++) { buttons[i].classList.remove('on'); } $('d-now').classList.remove('on'); }
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].onclick = function () {
+        var t = new Date(this.getAttribute('data-t')); timeOffset = t.getTime() - Date.now(); clearOn(); this.classList.add('on'); last.key = ''; tick();
+      };
+    }
+    $('d-now').onclick = function () { timeOffset = 0; clearOn(); this.classList.add('on'); last.key = ''; tick(); };
+    $('d-bcast').onclick = function () {
+      if (data.settings.broadcast) { data.settings.broadcast = ''; this.classList.remove('on'); }
+      else { data.settings.broadcast = 'Tornado drill at 10:15. Teachers, review your shelter location before 4th hour.'; this.classList.add('on'); }
+      renderBanner();
+    };
+    if (!qs.t) { buttons[1].click(); } else { clearOn(); }
+  }
+
+  /* ---- start ---- */
+  setupDemo();
+
+  /* ---- room picker: each screen picks and remembers its own room ---- */
+  function roomList() {
+    var out = [], seen = {}, src = (data && data.rooms && data.rooms.length) ? data.rooms : null, i, r;
+    if (!src && window.SIGNAGE_SEED) {
+      src = [];
+      for (i = 0; i < window.SIGNAGE_SEED.rooms.length; i++) { src.push({ room: window.SIGNAGE_SEED.rooms[i][0] }); }
+    }
+    src = src || [];
+    for (i = 0; i < src.length; i++) { r = src[i].room; if (r && !seen[r]) { seen[r] = true; out.push(r); } }
+    out.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+    return out;
+  }
+  function renderPicker() {
+    var grid = $('pk-grid'), q = ($('pk-search').value || '').toLowerCase(), list = roomList(), i, b;
+    grid.innerHTML = '';
+    for (i = 0; i < list.length; i++) {
+      if (q && list[i].toLowerCase().indexOf(q) === -1) { continue; }
+      b = document.createElement('button');
+      b.textContent = list[i];
+      if (list[i] === room) { b.className = 'cur'; }
+      b.setAttribute('data-room', list[i]);
+      grid.appendChild(b);
+    }
+  }
+  function openPicker() { $('picker').hidden = false; renderPicker(); try { $('pk-search').focus(); } catch (e) {} }
+  $('pk-grid').onclick = function (ev) {
+    var t = ev.target, r = t && t.getAttribute ? t.getAttribute('data-room') : '';
+    if (!r) { return; }
+    saveRoom(r); room = r; $('picker').hidden = true; last.key = ''; tick();
+    var sel = document.getElementById('d-room'); if (sel) { sel.value = r; }
+  };
+  $('pk-search').oninput = renderPicker;
+  $('setroom').onclick = openPicker;
+  (function waitForRoom() {
+    if (room) { return; }
+    if (data) { openPicker(); return; }
+    setTimeout(waitForRoom, 300);
+  })();
+
+  load();
+  setInterval(tick, 1000);
+  setInterval(heartbeat, 300000);
+  setTimeout(heartbeat, 15000);
+  setTimeout(function () { window.location.reload(); }, 24 * 3600 * 1000 + Math.floor(Math.random() * 1800000)); /* daily refresh, staggered up to 30 min per screen */
+})();
+</script>
+</body>
+</html>
