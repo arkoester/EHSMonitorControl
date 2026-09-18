@@ -125,6 +125,31 @@
 .pk-note { color:#8A94A3; font-size:clamp(11px,1.2vw,14px); margin-top:2.6vh; }
 #setroom { position:fixed; right:10px; bottom:10px; z-index:55; width:34px; height:34px; border-radius:50%; border:1px solid #2A313C; background:rgba(26,31,39,.6); color:#8A94A3; font-size:18px; line-height:1; cursor:pointer; opacity:.35; }
 #setroom:hover { opacity:1; border-color:#F26B1D; color:#F2F4F7; }
+
+  /* Native daily-announcements deck (scraped nightly from the school site) */
+  #ann { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 6vh 8vw; background: radial-gradient(120% 120% at 20% 0%, #171C24 0%, #0E1116 60%); }
+  #ann[hidden] { display: none; }
+  .ann-kick { display: flex; justify-content: space-between; align-items: baseline; color: #F26B1D; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; font-size: clamp(12px, 1.4vw, 18px); margin-bottom: 3vh; }
+  .ann-kick #ann-date { color: #8A94A3; letter-spacing: .08em; text-transform: none; font-weight: 600; }
+  #ann-title { font-size: clamp(26px, 3.6vw, 52px); font-weight: 800; line-height: 1.15; margin-bottom: 2.2vh; }
+  #ann-text { font-size: clamp(18px, 2.3vw, 32px); line-height: 1.5; color: #DDE3EA; max-width: 34em; }
+  .ann-foot { margin-top: auto; display: flex; align-items: center; gap: 14px; color: #8A94A3; font-size: clamp(12px, 1.3vw, 16px); }
+  .ann-foot .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #2A313C; margin-right: 6px; }
+  .ann-foot .dot.on { background: #F26B1D; }
+
+  /* Screen controls: manual mode override */
+  #ctl { position: fixed; inset: 0; background: rgba(10,12,16,.94); z-index: 62; display: flex; align-items: center; justify-content: center; }
+  #ctl[hidden] { display: none; }
+  .ctl-box { width: min(560px, 92vw); text-align: center; }
+  .ctl-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 1vh 0 2.4vh; }
+  .ctl-row button { font: inherit; font-weight: 700; font-size: clamp(15px, 1.8vw, 21px); padding: 14px 22px; border-radius: 999px; border: 1px solid #2A313C; background: #1A1F27; color: #F2F4F7; cursor: pointer; }
+  .ctl-row button:hover, .ctl-row button:focus { border-color: #F26B1D; outline: none; }
+  .ctl-row button.on { background: #F26B1D; border-color: #F26B1D; color: #111; }
+  .ctl-link { font: inherit; margin-top: 2.2vh; background: none; border: none; color: #8A94A3; text-decoration: underline; cursor: pointer; font-size: clamp(13px, 1.4vw, 17px); }
+  .ctl-link:hover { color: #F2F4F7; }
+  #ovbadge { position: fixed; left: 12px; bottom: 12px; z-index: 55; background: #F26B1D; color: #111; font-weight: 800; letter-spacing: .08em; font-size: clamp(11px, 1.2vw, 15px); padding: 8px 14px; border-radius: 999px; }
+  #ovbadge[hidden] { display: none; }
+  #setroom.manual { opacity: 1; border-color: #F26B1D; color: #F26B1D; background: rgba(242,107,29,.15); }
 </style>
 </head>
 <body>
@@ -143,7 +168,15 @@
   <div class="foot"><div id="t-date"></div><div><b id="t-school"></b> &middot; <span id="t-room"></span></div></div>
 </main>
 
-<section id="deck" class="view" hidden><div class="frame" id="deck-frame"></div></section>
+<section id="deck" class="view" hidden>
+  <div class="frame" id="deck-frame"></div>
+  <div id="ann" hidden>
+    <div class="ann-kick"><span>Daily Announcements</span><span id="ann-date"></span></div>
+    <div id="ann-title"></div>
+    <div id="ann-text"></div>
+    <div class="ann-foot"><span id="ann-dots"></span><span id="ann-count"></span></div>
+  </div>
+</section>
 <section id="video" class="view" hidden><div class="frame" id="video-frame"></div></section>
 
 <div id="chip" hidden><span class="t" id="c-clock"></span><span class="n" id="c-next"></span></div>
@@ -158,7 +191,22 @@
     <div class="pk-note">Saved on this screen only. The &#8942; button in the corner changes it later.</div>
   </div>
 </div>
-<button id="setroom" title="Set this screen's room">&#8942;</button>
+<div id="ctl" hidden>
+  <div class="pk-box ctl-box">
+    <div class="pk-kick">Screen controls</div>
+    <h2 id="ctl-room"></h2>
+    <div class="ctl-row" id="ctl-modes">
+      <button data-mode="">Auto</button>
+      <button data-mode="targets">Targets</button>
+      <button data-mode="deck">Announcements</button>
+      <button data-mode="video">Video</button>
+    </div>
+    <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. It never carries into tomorrow.</div>
+    <button id="ctl-pick" class="ctl-link">Set this screen's room&hellip;</button>
+  </div>
+</div>
+<div id="ovbadge" hidden></div>
+<button id="setroom" title="Screen controls">&#8942;</button>
 <div id="status" class="down" title="data status"></div>
 
 <aside id="demo" hidden>
@@ -423,7 +471,7 @@ window.SIGNAGE_SEED = {
   [
    "deck_url",
    "",
-   "Google Slides: File > Share > Publish to web > Embed, then paste the src URL here. The office owns this deck."
+   "Google Slides: File > Share > Publish to web > Embed, then paste the src URL here. The office owns this deck. Shown only when the nightly announcements feed is empty."
   ],
   [
    "deck_delay_ms",
@@ -469,6 +517,11 @@ window.SIGNAGE_SEED = {
    "heartbeat_url",
    "",
    "Optional Apps Script web app URL. Screens check in every 5 minutes so you can see which rooms are live."
+  ],
+  [
+   "announcement_seconds",
+   "12",
+   "Seconds each daily announcement stays on the wall before rotating."
   ]
  ],
  "bell": [
@@ -1082,7 +1135,24 @@ window.SIGNAGE_SEED = {
     ""
    ]
   ]
- }
+ },
+ "announcements": [
+  [
+   "September 18, 2026",
+   "Daily announcements, automatically",
+   "The nightly compiler reads the school's Daily Announcements page and puts it here. Nobody maintains this screen."
+  ],
+  [
+   "September 18, 2026",
+   "Club meeting today",
+   "Chess Club meets after school in the library. New members welcome - bring a friend."
+  ],
+  [
+   "September 18, 2026",
+   "Spirit week is coming",
+   "Friday is orange and black day. Show your stripes, Tigers."
+  ]
+ ]
 };
 </script>
 <script>
@@ -1129,6 +1199,7 @@ window.SIGNAGE_SEED = {
     d.bell = seed.bell.map(function (r) { return { day_type: r[0], period: r[1], label: r[2], start: r[3], end: r[4] }; });
     d.daytypes = seed.daytypes.map(function (r) { return { date: r[0], day_type: r[1], note: r[2] }; });
     d.rooms = seed.rooms.map(function (r) { return { room: r[0], period: r[1], course: r[2], course_title: r[3], teacher: r[4], day_type: r[5] }; });
+    d.announcements = (seed.announcements || []).map(function (r) { return { date: r[0], title: r[1], text: r[2] }; });
     Object.keys(seed.courses).forEach(function (k) {
       d.courses[k] = seed.courses[k].map(function (r) { return { unit: r[0], starts: r[1], learning_target_s: r[2], success_criteria: r[3], current: r[4], notes: r[5] }; });
     });
@@ -1216,13 +1287,38 @@ window.SIGNAGE_SEED = {
   function placeholder(frame, big, small) {
     frame.innerHTML = '<div class="placeholder"><div class="big">' + big + '</div><div class="small">' + small + '</div></div>';
   }
+  var annIdx = 0, annTimer = null, annKey = '';
+  function paintAnn(items) {
+    var it = items[annIdx] || items[0], dots = '', i;
+    $('ann-date').textContent = it.date || '';
+    $('ann-title').textContent = it.title || '';
+    $('ann-text').textContent = it.text || '';
+    $('ann-count').textContent = items.length > 1 ? ((annIdx + 1) + ' / ' + items.length) : '';
+    for (i = 0; i < Math.min(items.length, 12); i++) { dots += '<span class="dot' + (i === annIdx ? ' on' : '') + '"></span>'; }
+    $('ann-dots').innerHTML = dots;
+  }
+  function startAnnRotation(items) {
+    var key = items.length + '|' + ((items[0] && items[0].title) || '') + '|' + ((items[0] && items[0].date) || '');
+    if (annTimer && annKey === key) { return; }
+    if (annTimer) { clearInterval(annTimer); annTimer = null; }
+    annKey = key; annIdx = 0;
+    paintAnn(items);
+    var secs = parseInt(data.settings.announcement_seconds, 10) || 12;
+    if (items.length > 1) {
+      annTimer = setInterval(function () { annIdx = (annIdx + 1) % items.length; paintAnn(items); }, secs * 1000);
+    }
+  }
   function deckSrc(url, delay) {
     if (!url) { return ''; }
     var base = url.split('?')[0].replace(/\/pub$/, '/embed');
     return base + '?start=true&loop=true&delayms=' + delay + '&rm=minimal';
   }
   function ensureDeck() {
-    var frame = $('deck-frame'), s = data.settings, url = deckSrc(s.deck_url, parseInt(s.deck_delay_ms, 10) || 8000);
+    var items = (data && data.announcements && data.announcements.length) ? data.announcements : null;
+    var ann = $('ann'), frame = $('deck-frame');
+    if (items) { frame.hidden = true; ann.hidden = false; startAnnRotation(items); return; }
+    ann.hidden = true; frame.hidden = false;
+    var s = data.settings, url = deckSrc(s.deck_url, parseInt(s.deck_delay_ms, 10) || 8000);
     if (demo || !url) {
       if (deckUrlLoaded !== 'placeholder') { placeholder(frame, 'Announcements deck', demo ? 'The office\u2019s Google Slides deck plays here, full screen, on a loop.' : 'Add the published Slides embed URL to Settings \u203a deck_url.'); deckUrlLoaded = 'placeholder'; }
       return;
@@ -1290,7 +1386,8 @@ window.SIGNAGE_SEED = {
     text('t-clock', fmtClock(d));
     if (!data) { return; }
     var dec = E.decide(d, data, room);
-    var key = [dec.mode, dec.period ? dec.period.period : '', dec.course ? dec.course.course : '', dec.unit ? E.field(dec.unit, ['unit']) : '', dec.dayType].join('|');
+    dec = applyOverride(dec);
+    var key = [dec.mode, dec.period ? dec.period.period : '', dec.course ? dec.course.course : '', dec.unit ? E.field(dec.unit, ['unit']) : '', dec.dayType, ovr ? 'M' + ovr.mode : ''].join('|');
     if (key !== last.key) { render(dec, d); last.key = key; }
     renderChip(dec, d); renderBar(dec, d); renderBanner(); setStatus();
     if (demo) { text('d-read', dec.mode.toUpperCase() + ' \u00b7 ' + dec.reason + ' \u00b7 ' + (dec.dayType || 'no school') + (dec.period ? ' \u00b7 ' + dec.period.label + ' (' + Math.floor(dec.period.elapsed) + ' min in)' : '')); }
@@ -1373,6 +1470,52 @@ window.SIGNAGE_SEED = {
     if (data) { openPicker(); return; }
     setTimeout(waitForRoom, 300);
   })();
+
+
+  /* ---- manual mode override: situational, ephemeral by design ---- */
+  var ovr = null;   /* { mode, setAt, pkey } - never persisted; a reload or the next bell clears it */
+  function periodKey(dec) { return (dec.dayType || '') + '|' + (dec.period ? dec.period.period : 'none'); }
+  function setOvBadge() {
+    var b = $('ovbadge'), names = { targets: 'Targets', deck: 'Announcements', video: 'Video' };
+    if (ovr) { b.hidden = false; b.textContent = 'MANUAL \u00B7 ' + names[ovr.mode] + ' \u00B7 until the next bell'; $('setroom').classList.add('manual'); }
+    else { b.hidden = true; $('setroom').classList.remove('manual'); }
+  }
+  function applyOverride(dec) {
+    if (ovr) {
+      var pk = periodKey(dec);
+      if (Date.now() - ovr.setAt > 3600000 || pk !== ovr.pkey) { ovr = null; }
+      else {
+        dec.mode = ovr.mode; dec.reason = 'manual override';
+        if (ovr.mode === 'targets') {
+          if (!dec.course) { dec.course = { course: '', course_title: '', teacher: '' }; }
+          if (!dec.unit) { dec.unit = { unit: '', learning_target_s: '', success_criteria: '' }; }
+        }
+      }
+    }
+    setOvBadge();
+    return dec;
+  }
+  function setOverride(mode) {
+    if (!data) { return; }
+    ovr = mode ? { mode: mode, setAt: Date.now(), pkey: periodKey(E.decide(now(), data, room)) } : null;
+    $('ctl').hidden = true;
+    setOvBadge(); last.key = ''; tick();
+  }
+  function openCtl() {
+    $('ctl-room').textContent = room || '';
+    var btns = $('ctl-modes').children, cur = ovr ? ovr.mode : '', i;
+    for (i = 0; i < btns.length; i++) { btns[i].classList.toggle('on', btns[i].getAttribute('data-mode') === cur); }
+    $('ctl').hidden = false;
+  }
+  $('ctl-modes').onclick = function (ev) {
+    var t = ev.target, m = t && t.getAttribute ? t.getAttribute('data-mode') : null;
+    if (m === null) { return; }
+    setOverride(m || null);
+  };
+  $('ctl-pick').onclick = function () { $('ctl').hidden = true; openPicker(); };
+  $('ctl').onclick = function (ev) { if (ev.target === this) { this.hidden = true; } };
+  $('picker').onclick = function (ev) { if (ev.target === this && room) { this.hidden = true; } };
+  $('setroom').onclick = openCtl;
 
   load();
   setInterval(tick, 1000);

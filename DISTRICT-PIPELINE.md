@@ -61,11 +61,32 @@ SharePoint library "CTE Displays"            One always-on PC (4:15 AM)         
   It is on your wall the next school day. That is the whole job. Running
   ahead or behind? Put an `x` in Current (teacher file) or `now` in the
   unit's Notes cell (scope & sequence file) - the calendar yields to you
-  until you clear it.
+  until you clear it. Need the wall to show something else *right now*
+  (assembly ran long, the bell is off)? Tap the corner &#8942; on the
+  screen: Auto / Targets / Announcements / Video. Manual mode shows an
+  orange MANUAL badge, wears off at the next bell or after an hour, and
+  never survives into the next day.
 - **Office:** bell changes, day types, room moves, and the broadcast banner
   live in the registry. They also ride the nightly compile - for a
   same-morning change (surprise late start at 6:45), edit the registry and
   double-click **Publish Now**; screens update within about a minute.
+- **Daily announcements, hands-free:** the compiler scrapes the school's
+  public Daily Announcements page (ehs.ecusd7.org/link-2) every night, and
+  every idle screen rotates through the items - the page's own date line,
+  each bold lead as the title, the rest as the body. Nobody maintains a
+  slide deck. If the page can't be read or parses to zero items, screens
+  keep yesterday's announcements and the report says so; a same-morning
+  repost on the website rides Publish Now like everything else. The
+  deck_url Slides embed remains as a fallback when the feed is empty.
+- **Friday video announcements, hands-free too:** `video_url` points at
+  EHS Broadcasting's uploads playlist, so the Friday video window
+  automatically plays the club's newest morning show - no weekly link
+  chasing, nothing to update. When the club starts broadcasting live,
+  flip one pair of settings: clear `video_url`, put the channel ID
+  (UC9JqMASFrPtxEgmjsFainRg) in `video_channel_id`, and the live stream
+  takes over the window. Kiosk sound note: launch the browser with
+  `--autoplay-policy=no-user-gesture-required` so the video plays with
+  audio and no click.
 - **You:** skim `compile-report.txt` in the library with your coffee. It
   names the file, the tab, and the unit for every issue.
 
