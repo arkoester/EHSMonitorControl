@@ -222,6 +222,11 @@
       <span class="ctl-lab">Text size</span>
       <button data-size="-">A&minus;</button><span id="ctl-size-val">100%</span><button data-size="+">A+</button>
     </div>
+    <div class="ctl-row" id="ctl-refresh">
+      <button data-act="check">Check for updates</button>
+      <button data-act="reload">Reload screen</button>
+    </div>
+    <div class="pk-note" id="ctl-status"></div>
     <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. It never carries into tomorrow. Text size is saved on this screen.</div>
     <button id="ctl-pick" class="ctl-link">Set this screen's room&hellip;</button>
   </div>
@@ -1470,6 +1475,7 @@ window.SIGNAGE_SEED = {
   function escapeHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
 
   function tick() {
+    wakeCheck();
     var d = now();
     text('t-clock', fmtClock(d));
     if (!data) { return; }
@@ -1667,6 +1673,7 @@ window.SIGNAGE_SEED = {
   }
   function openCtl() {
     $('ctl-room').textContent = room || '';
+    ctlStatus();
     applyScale();
     $('ctl-pickers').hidden = !(ovr && ovr.mode === 'targets');
     if (ovr && ovr.mode === 'targets') { fillPickers(); }
@@ -1694,6 +1701,30 @@ window.SIGNAGE_SEED = {
   $('ctl').onclick = function (ev) { if (ev.target === this) { this.hidden = true; } };
   $('picker').onclick = function (ev) { if (ev.target === this && room) { this.hidden = true; } };
   $('setroom').onclick = openCtl;
+  /* ---- catching up after the device was off or asleep ---- */
+  function ago(ms) { var m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : (m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'); }
+  function fmtGen(g) { var d = g ? new Date(g) : null; return (d && !isNaN(d)) ? d.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '?'; }
+  function ctlStatus(extra) {
+    var st = $('ctl-status'); if (!st) { return; }
+    st.textContent = (data && data.generated ? 'Wall data compiled ' + fmtGen(data.generated) + ' \u00B7 ' : '') + (lastGood ? 'last checked ' + ago(lastGood) : 'not checked yet') + (extra ? ' \u00B7 ' + extra : '');
+  }
+  $('ctl-refresh').onclick = function (ev) {
+    var t = ev.target, a = t && t.getAttribute ? t.getAttribute('data-act') : null;
+    if (a === 'reload') { window.location.reload(); return; }
+    if (a !== 'check') { return; }
+    ctlStatus('checking\u2026');
+    var before = seenVersion;
+    load().then(function () { ctlStatus(seenVersion !== before ? 'new data loaded' : 'already up to date'); }, function () { ctlStatus('could not reach the server'); });
+  };
+  var lastTickMs = 0;
+  function wakeCheck() {
+    /* a gap between ticks means the machine slept or the page was frozen: catch up immediately */
+    var n = Date.now();
+    if (lastTickMs && n - lastTickMs > 120000) { load(); }
+    lastTickMs = n;
+  }
+  window.addEventListener('online', function () { load(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { wakeCheck(); load(); } });
 
   load();
   setInterval(tick, 1000);
