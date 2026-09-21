@@ -131,8 +131,8 @@
   #ann[hidden] { display: none; }
   .ann-kick { display: flex; justify-content: space-between; align-items: baseline; color: #F26B1D; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; font-size: clamp(12px, 1.4vw, 18px); margin-bottom: 3vh; }
   .ann-kick #ann-date { color: #8A94A3; letter-spacing: .08em; text-transform: none; font-weight: 600; }
-  #ann-title { font-size: clamp(26px, 3.6vw, 52px); font-weight: 800; line-height: 1.15; margin-bottom: 2.2vh; }
-  #ann-text { font-size: clamp(18px, 2.3vw, 32px); line-height: 1.5; color: #DDE3EA; max-width: 34em; }
+  #ann-title { font-size: clamp(32px, 4.6vw, 68px); font-weight: 800; line-height: 1.15; margin-bottom: 2.2vh; }
+  #ann-text { font-size: clamp(22px, 3vw, 44px); line-height: 1.45; color: #DDE3EA; max-width: 30em; }
   .ann-foot { margin-top: auto; display: flex; align-items: center; gap: 14px; color: #8A94A3; font-size: clamp(12px, 1.3vw, 16px); }
   .ann-foot .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #2A313C; margin-right: 6px; }
   .ann-foot .dot.on { background: #F26B1D; }
@@ -150,6 +150,19 @@
   #ovbadge { position: fixed; left: 12px; bottom: 12px; z-index: 55; background: #F26B1D; color: #111; font-weight: 800; letter-spacing: .08em; font-size: clamp(11px, 1.2vw, 15px); padding: 8px 14px; border-radius: 999px; }
   #ovbadge[hidden] { display: none; }
   #setroom.manual { opacity: 1; border-color: #F26B1D; color: #F26B1D; background: rgba(242,107,29,.15); }
+
+  #ctl-pickers { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 2vh; }
+  #ctl-pickers[hidden] { display: none; }
+  .ctl-lab { color: #8A94A3; font-size: clamp(12px, 1.3vw, 16px); display: inline-flex; align-items: center; gap: 8px; }
+  #ctl-pickers select { font: inherit; font-size: clamp(13px, 1.4vw, 17px); padding: 8px 10px; border-radius: 10px; border: 1px solid #2A313C; background: #0E1116; color: #F2F4F7; max-width: 46vw; }
+  #ctl-pickers select:focus { border-color: #F26B1D; outline: none; }
+  .ctl-size { align-items: center; }
+  .ctl-size button { padding: 8px 16px; font-size: clamp(13px, 1.5vw, 18px); }
+  #ctl-size-val { color: #F2F4F7; min-width: 4.5em; font-size: clamp(12px, 1.3vw, 16px); }
+
+  #warn { position: fixed; left: 12px; bottom: 12px; z-index: 54; background: rgba(186,117,23,.92); color: #111; font-weight: 700; font-size: clamp(11px, 1.1vw, 14px); padding: 6px 12px; border-radius: 999px; max-width: 60vw; }
+  #warn[hidden] { display: none; }
+  #ovbadge:not([hidden]) ~ #warn { bottom: 52px; }
 </style>
 </head>
 <body>
@@ -201,11 +214,20 @@
       <button data-mode="deck">Announcements</button>
       <button data-mode="video">Video</button>
     </div>
-    <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. It never carries into tomorrow.</div>
+    <div id="ctl-pickers" hidden>
+      <label class="ctl-lab">Hour <select id="ctl-period"></select></label>
+      <label class="ctl-lab">Unit <select id="ctl-unit"></select></label>
+    </div>
+    <div class="ctl-row ctl-size" id="ctl-size">
+      <span class="ctl-lab">Text size</span>
+      <button data-size="-">A&minus;</button><span id="ctl-size-val">100%</span><button data-size="+">A+</button>
+    </div>
+    <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. It never carries into tomorrow. Text size is saved on this screen.</div>
     <button id="ctl-pick" class="ctl-link">Set this screen's room&hellip;</button>
   </div>
 </div>
 <div id="ovbadge" hidden></div>
+<div id="warn" hidden></div>
 <button id="setroom" title="Screen controls">&#8942;</button>
 <div id="status" class="down" title="data status"></div>
 
@@ -383,7 +405,7 @@
   }
   /* Split a cell into display lines: newlines or " | " separators; strip leading bullets. */
   function lines(text) {
-    return String(text == null ? '' : text).split(/\r?\n|\s*\|\s*/).map(function (t) { return t.replace(/^[\-\u2022\*]\s*/, '').trim(); }).filter(Boolean);
+    return String(text == null ? '' : text).split(/\r?\n|\s*\|\s*/).map(function (t) { return t.replace(/^(?:[\-\u2022\*\u2013\u25CF\u25E6\u2023]|\d{1,2}[.)])\s*/, '').trim(); }).filter(Boolean);
   }
   function inVideoWindow(d, settings) {
     settings = settings || {};
@@ -1188,9 +1210,24 @@ window.SIGNAGE_SEED = {
   var demo = qs.demo === '1';
   var timeOffset = 0;
   if (qs.t) { var sim = new Date(qs.t); if (!isNaN(sim.getTime())) { timeOffset = sim.getTime() - Date.now(); } }
-  function now() { return new Date(Date.now() + timeOffset); }
+  function now() { return new Date(Date.now() + (timeOffset ? timeOffset : clockOffset)); }
+  function nextPollMs() {
+    /* When to look for new data. The check itself is a few bytes, so "often" is cheap;
+       these windows are about when anything could actually have changed. */
+    var t = now(), dow = t.getDay(), h = t.getHours() + t.getMinutes() / 60, st = (data && data.settings) || {};
+    var hot = (parseFloat(st.refresh_seconds) || 60) * 1000;          /* weekday mornings */
+    var day = (parseFloat(st.refresh_seconds_day) || 120) * 1000;     /* rest of the school day */
+    function until(hour, tomorrow) { var x = new Date(t); if (tomorrow) { x.setDate(x.getDate() + 1); } x.setHours(hour, 0, 0, 0); return Math.max(60000, x.getTime() - t.getTime()); }
+    if (dow === 0 || dow === 6) {
+      if (h >= 7 && h < 17) { return 2 * 3600000; }                    /* weekends: every other hour, 7-5 */
+      return until((dow === 0 && h >= 17) ? 6 : 7, h >= 17);           /* otherwise sleep until 7:00 (6:00 if Monday is next) */
+    }
+    if (h >= 6 && h < 9.5) { return hot; }                             /* 6:00 through 2nd hour */
+    if (h >= 9.5 && h < 17) { return day; }
+    return until(6, h >= 17);                                          /* overnight: sleep until 6:00 */
+  }
 
-  var data = null, lastGood = 0, last = { key: '' }, deckUrlLoaded = '', refreshMs = 60000, refreshTimer = null;
+  var data = null, lastGood = 0, last = { key: '' }, deckUrlLoaded = '', refreshMs = 60000, refreshTimer = null, lastWait = 60000;
 
   /* ---- data: demo seed, Google Sheet CSV, or JSON endpoint ---- */
   function seedToData(seed) {
@@ -1228,9 +1265,41 @@ window.SIGNAGE_SEED = {
         })).then(function () { return d; });
       });
   }
+  var clockOffset = 0;   /* server clock minus device clock, read from response headers */
+  var seenVersion = '';  /* the version.txt value the current data.json came from */
+  function readServerClock(r, sent) {
+    var hd = r.headers.get('date');
+    if (!hd) { return; }
+    var sv = new Date(hd).getTime(), rtt = Date.now() - sent, off = sv + rtt / 2 - Date.now();
+    if (!isNaN(sv) && Math.abs(off) < 86400000) { clockOffset = Math.abs(off) > 60000 ? off : 0; }
+  }
+  function fetchData(url, mode) {
+    var sent = Date.now();
+    return fetch(url, { cache: mode || 'no-cache' }).then(function (r) {
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      readServerClock(r, sent);
+      return r.text();
+    }).then(function (txt) { return JSON.parse(txt); });
+  }
   function loadFromDataUrl() {
-    var u = (CONFIG.dataUrl || 'data.json') + '?_=' + Date.now();
-    return fetchText(u).then(function (txt) { return JSON.parse(txt); });
+    /* Two-step poll so "Publish Now" means now without a bandwidth bill:
+       1. version.txt - a few bytes, fetched fresh every poll (cache-busted, so the CDN can't hide a new push).
+       2. data.json   - fetched only when the version changed, with the version as the cache key.
+       Screens on a site with no version.txt fall back to ETag polling of data.json. */
+    var base = CONFIG.dataUrl || 'data.json';
+    var vurl = base.replace(/[^\/]*$/, 'version.txt');
+    var sent = Date.now();
+    return fetch(vurl + '?_=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) { throw new Error('no version file'); }
+      readServerClock(r, sent);
+      return r.text();
+    }).then(function (v) {
+      v = (v || '').trim();
+      if (v && v === seenVersion && data && !data._fallback) { return null; }     /* unchanged: nothing to do */
+      return fetchData(base + '?v=' + encodeURIComponent(v || String(Date.now())), 'no-store').then(function (d) { seenVersion = v; return d; });
+    }, function () {
+      return fetchData(base, 'no-cache');                                           /* legacy: no version.txt */
+    });
   }
   function loadFromJson() {
     var url = CONFIG.jsonUrl + (CONFIG.jsonUrl.indexOf('?') < 0 ? '?' : '&') + 'room=' + encodeURIComponent(room) + '&_=' + Date.now();
@@ -1241,8 +1310,14 @@ window.SIGNAGE_SEED = {
     if (demo) { p = Promise.resolve(seedToData(window.SIGNAGE_SEED)); }
     else if (CONFIG.jsonUrl) { p = loadFromJson(); }
     else if (CONFIG.sheetId) { p = loadFromSheet(); }
-    else { p = loadFromDataUrl().catch(function () { return seedToData(window.SIGNAGE_SEED); }); }
+    else {
+      p = loadFromDataUrl().catch(function (e) {
+        if (data && !data._fallback) { throw e; }          /* keep last good data; status goes amber, then red */
+        var sd = seedToData(window.SIGNAGE_SEED); sd._fallback = true; return sd;   /* nothing yet: sample data */
+      });
+    }
     return p.then(function (d) {
+      if (d === null) { lastGood = Date.now(); setStatus(); return; }
       var keep = data && demo ? data.settings : null;
       data = d;
       if (keep) { if (keep.broadcast) { data.settings.broadcast = keep.broadcast; } }
@@ -1254,12 +1329,25 @@ window.SIGNAGE_SEED = {
       if (!data) { data = seedToData(window.SIGNAGE_SEED); data._fallback = true; last.key = ''; tick(); }
       setStatus();
     }).then(function () {
-      clearTimeout(refreshTimer); refreshTimer = setTimeout(load, refreshMs + Math.random() * 15000); /* jitter: a building of screens never refreshes in lockstep */
+      var wait = nextPollMs(); lastWait = wait;
+      clearTimeout(refreshTimer); refreshTimer = setTimeout(load, wait + Math.random() * Math.min(15000, wait * 0.1)); /* jitter: a building of screens never refreshes in lockstep */
     });
   }
   function setStatus() {
     var el = document.getElementById('status');
-    el.className = (!data || data._fallback) ? 'down' : (Date.now() - lastGood > refreshMs * 3 ? 'stale' : '');
+    el.className = (!data || data._fallback) ? 'down' : (Date.now() - lastGood > Math.max(refreshMs, lastWait) * 3 + 30000 ? 'stale' : '');
+    var w = document.getElementById('warn'), msg = '';
+    try {
+      var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && tz !== 'America/Chicago' && !timeOffset) { msg = 'Device time zone is ' + tz + ' - set it to Central so periods line up'; }
+    } catch (e) {}
+    if (!msg && Math.abs(clockOffset) > 5 * 60000) { msg = 'Device clock is off by ' + Math.round(Math.abs(clockOffset) / 60000) + ' min - corrected automatically, but fix the clock'; }
+    if (!msg && data && data.generated && !data._fallback) {
+      var age = now().getTime() - new Date(data.generated).getTime();
+      if (age > 36 * 3600000) { msg = 'Wall data is ' + Math.round(age / 86400000) + ' days old - the nightly compile has not run'; }
+    }
+    if (!msg && data && data._fallback && !demo) { msg = 'Showing sample data - no data.json published yet'; }
+    if (w) { w.textContent = msg; w.hidden = !msg; }
   }
 
   /* ---- rendering ---- */
@@ -1359,7 +1447,7 @@ window.SIGNAGE_SEED = {
     var s = data.settings;
     if (dec.mode === 'targets') {
       var c = dec.course, u = dec.unit;
-      text('t-course', c.course_title || c.course); text('t-period', dec.period.label);
+      text('t-course', c.course_title || c.course); text('t-period', dec.period ? dec.period.label : '');
       text('t-unit', E.field(u, ['unit', 'chapter_unit', 'title']));
       fillList('t-lt', E.lines(E.field(u, ['learning_target_s', 'learning_targets', 'learning_target', 'targets', 'lt'])), 'lt');
       fillList('t-sc', E.lines(E.field(u, ['success_criteria', 'criteria', 'sc'])), 'sc');
@@ -1465,6 +1553,7 @@ window.SIGNAGE_SEED = {
   };
   $('pk-search').oninput = renderPicker;
   $('setroom').onclick = openPicker;
+  applyScale();
   (function waitForRoom() {
     if (room) { return; }
     if (data) { openPicker(); return; }
@@ -1473,7 +1562,45 @@ window.SIGNAGE_SEED = {
 
 
   /* ---- manual mode override: situational, ephemeral by design ---- */
-  var ovr = null;   /* { mode, setAt, pkey } - never persisted; a reload or the next bell clears it */
+  var ovr = null;   /* { mode, setAt, pkey, row, unit } - never persisted; a reload or the next bell clears it */
+  function roomRows() {
+    var out = [], i, r;
+    for (i = 0; i < ((data && data.rooms) || []).length; i++) {
+      r = data.rooms[i];
+      if (E.norm(r.room) === E.norm(room) && r.course) { out.push(r); }
+    }
+    out.sort(function (a, b) { return (parseInt(a.period, 10) || 0) - (parseInt(b.period, 10) || 0); });
+    return out;
+  }
+  function bellLabel(p) {
+    var i, b = (data && data.bell) || [];
+    for (i = 0; i < b.length; i++) { if (String(b[i].period) === String(p)) { return b[i].label || ('Period ' + p); } }
+    return 'Period ' + p;
+  }
+  function unitsFor(courseName) { return (data && data.courses && data.courses[courseName]) || []; }
+  function pickUnit(units, d) {
+    var i, best = null, bestT = '', st, u;
+    for (i = 0; i < units.length; i++) {
+      u = units[i];
+      if (/^(x|yes|y|true|1|now|current)$/i.test(String(E.field(u, ['current']) || '').trim())) { return u; }
+      st = E.parseDate(E.field(u, ['starts', 'start', 'date']));
+      if (st && st <= E.ymd(d) && st > bestT) { bestT = st; best = u; }
+    }
+    return best || units[0] || null;
+  }
+  /* saved text scale, per screen */
+  function savedScale() { try { return parseFloat(window.localStorage.getItem('ehs_scale')) || 1; } catch (e) { return 1; } }
+  var scale = savedScale();
+  function applyScale() {
+    var i, els = [$('targets'), $('ann')];
+    for (i = 0; i < els.length; i++) { if (els[i]) { els[i].style.zoom = scale; } }
+    var v = $('ctl-size-val'); if (v) { v.textContent = Math.round(scale * 100) + '%'; }
+  }
+  function setScale(delta) {
+    scale = Math.min(1.6, Math.max(0.7, Math.round((scale + delta) * 20) / 20));
+    try { window.localStorage.setItem('ehs_scale', String(scale)); } catch (e) {}
+    applyScale();
+  }
   function periodKey(dec) { return (dec.dayType || '') + '|' + (dec.period ? dec.period.period : 'none'); }
   function setOvBadge() {
     var b = $('ovbadge'), names = { targets: 'Targets', deck: 'Announcements', video: 'Video' };
@@ -1487,7 +1614,14 @@ window.SIGNAGE_SEED = {
       else {
         dec.mode = ovr.mode; dec.reason = 'manual override';
         if (ovr.mode === 'targets') {
+          if (ovr.row) {
+            dec.course = ovr.row;
+            dec.period = { period: ovr.row.period, label: bellLabel(ovr.row.period), start: '', end: '' };
+          }
           if (!dec.course) { dec.course = { course: '', course_title: '', teacher: '' }; }
+          var us = unitsFor(dec.course.course);
+          if (ovr.unit !== '' && ovr.unit !== null && us[parseInt(ovr.unit, 10)]) { dec.unit = us[parseInt(ovr.unit, 10)]; }
+          else if (!dec.unit) { dec.unit = pickUnit(us, now()); }
           if (!dec.unit) { dec.unit = { unit: '', learning_target_s: '', success_criteria: '' }; }
         }
       }
@@ -1497,20 +1631,64 @@ window.SIGNAGE_SEED = {
   }
   function setOverride(mode) {
     if (!data) { return; }
-    ovr = mode ? { mode: mode, setAt: Date.now(), pkey: periodKey(E.decide(now(), data, room)) } : null;
-    $('ctl').hidden = true;
+    if (!mode) { ovr = null; $('ctl-pickers').hidden = true; $('ctl').hidden = true; setOvBadge(); last.key = ''; tick(); return; }
+    var rows = roomRows(), pv = $('ctl-period').value, uv = $('ctl-unit').value, rowSel = null, i;
+    for (i = 0; i < rows.length; i++) { if (String(rows[i].period) === String(pv)) { rowSel = rows[i]; } }
+    ovr = { mode: mode, setAt: Date.now(), pkey: periodKey(E.decide(now(), data, room)), row: rowSel, unit: uv };
+    if (mode !== 'targets') { $('ctl').hidden = true; }
     setOvBadge(); last.key = ''; tick();
+  }
+  function fillUnitSelect() {
+    var rows = roomRows(), pv = $('ctl-period').value, sel = $('ctl-unit'), row = null, i, us, o;
+    for (i = 0; i < rows.length; i++) { if (String(rows[i].period) === String(pv)) { row = rows[i]; } }
+    sel.innerHTML = '';
+    o = document.createElement('option'); o.value = ''; o.textContent = "Today's unit (automatic)"; sel.appendChild(o);
+    us = row ? unitsFor(row.course) : [];
+    for (i = 0; i < us.length; i++) {
+      o = document.createElement('option'); o.value = String(i);
+      o.textContent = E.field(us[i], ['unit', 'chapter_unit', 'title']) || ('Unit ' + (i + 1));
+      sel.appendChild(o);
+    }
+    if (!us.length && row) { sel.options[0].textContent = 'No units in this course yet'; }
+  }
+  function fillPickers() {
+    var rows = roomRows(), sel = $('ctl-period'), cur = E.decide(now(), data, room), i, o;
+    sel.innerHTML = '';
+    o = document.createElement('option'); o.value = ''; o.textContent = 'Current hour (automatic)'; sel.appendChild(o);
+    for (i = 0; i < rows.length; i++) {
+      o = document.createElement('option'); o.value = String(rows[i].period);
+      o.textContent = bellLabel(rows[i].period) + ' \u00B7 ' + (rows[i].course_title || rows[i].course);
+      sel.appendChild(o);
+    }
+    if (ovr && ovr.row) { sel.value = String(ovr.row.period); }
+    else if (cur.period) { sel.value = String(cur.period.period); }
+    fillUnitSelect();
+    if (ovr && ovr.unit) { $('ctl-unit').value = ovr.unit; }
   }
   function openCtl() {
     $('ctl-room').textContent = room || '';
+    applyScale();
+    $('ctl-pickers').hidden = !(ovr && ovr.mode === 'targets');
+    if (ovr && ovr.mode === 'targets') { fillPickers(); }
     var btns = $('ctl-modes').children, cur = ovr ? ovr.mode : '', i;
     for (i = 0; i < btns.length; i++) { btns[i].classList.toggle('on', btns[i].getAttribute('data-mode') === cur); }
     $('ctl').hidden = false;
   }
   $('ctl-modes').onclick = function (ev) {
-    var t = ev.target, m = t && t.getAttribute ? t.getAttribute('data-mode') : null;
+    var t = ev.target, m = t && t.getAttribute ? t.getAttribute('data-mode') : null, i, btns;
     if (m === null) { return; }
+    btns = $('ctl-modes').children;
+    for (i = 0; i < btns.length; i++) { btns[i].classList.toggle('on', btns[i] === t); }
+    $('ctl-pickers').hidden = (m !== 'targets');
+    if (m === 'targets') { fillPickers(); }
     setOverride(m || null);
+  };
+  $('ctl-period').onchange = function () { fillUnitSelect(); setOverride('targets'); };
+  $('ctl-unit').onchange = function () { setOverride('targets'); };
+  $('ctl-size').onclick = function (ev) {
+    var t = ev.target, k = t && t.getAttribute ? t.getAttribute('data-size') : null;
+    if (!k) { return; }
+    setScale(k === '+' ? 0.1 : -0.1);
   };
   $('ctl-pick').onclick = function () { $('ctl').hidden = true; openPicker(); };
   $('ctl').onclick = function (ev) { if (ev.target === this) { this.hidden = true; } };
