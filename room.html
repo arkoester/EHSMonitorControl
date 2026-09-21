@@ -24,7 +24,7 @@
     -webkit-font-smoothing: antialiased;
   }
   body.demo { cursor: default; }
-  .view { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms ease; }
+  .view { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms ease; overflow: hidden; }
   .view.active { opacity: 1; }
   .view[hidden] { display: none; }
 
@@ -41,20 +41,20 @@
   .course .sep { color: var(--dust); margin: 0 .5em; font-weight: 400; }
   .course .period { color: var(--chalk); }
   .clock { font-family: var(--display); font-size: 2.6vw; font-variant-numeric: tabular-nums; color: var(--chalk); letter-spacing: .02em; }
-  .unit { font-size: 3.1vw; font-weight: 600; line-height: 1.15; margin: 1.6vh 0 2.6vh; letter-spacing: -.01em; }
+  .unit { font-size: calc(3.1vw * var(--fit, 1)); font-weight: 600; line-height: 1.15; margin: 1.6vh 0 2.6vh; letter-spacing: -.01em; }
   .grid { flex: 1; display: grid; grid-template-columns: 3fr 2fr; gap: 3.2vw; min-height: 0; overflow: hidden; }
-  .col h2 { margin: 0 0 1.4vh; font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: 1.45vw; color: var(--dust); font-weight: 600; }
+  .col h2 { margin: 0 0 1.4vh; font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: calc(1.45vw * var(--fit, 1)); color: var(--dust); font-weight: 600; }
   .col ul { list-style: none; margin: 0; padding: 0; }
-  .col li { position: relative; padding-left: 1.5em; line-height: 1.25; margin-bottom: 1.6vh; }
-  .lt li { font-size: 3.0vw; font-weight: 600; }
+  .col li { position: relative; padding-left: 1.5em; line-height: 1.25; margin-bottom: calc(1.6vh * var(--fit, 1)); }
+  .lt li { font-size: calc(3.0vw * var(--fit, 1)); font-weight: 600; }
   .lt li::before { content: ""; position: absolute; left: .1em; top: .42em; width: .48em; height: .48em; background: var(--tiger); border-radius: 50%; }
-  .sc li { font-size: 2.15vw; color: var(--chalk); }
+  .sc li { font-size: calc(2.15vw * var(--fit, 1)); color: var(--chalk); }
   .sc li::before { content: "\2713"; position: absolute; left: 0; top: 0; color: var(--tiger); font-weight: 700; }
-  .lt.n3 li { font-size: 2.6vw; }
-  .lt.n4 li { font-size: 2.25vw; }
-  .lt.n5 li { font-size: 2.0vw; }
-  .sc.n4 li { font-size: 1.9vw; }
-  .sc.n5 li { font-size: 1.7vw; }
+  .lt.n3 li { font-size: calc(2.6vw * var(--fit, 1)); }
+  .lt.n4 li { font-size: calc(2.25vw * var(--fit, 1)); }
+  .lt.n5 li { font-size: calc(2.0vw * var(--fit, 1)); }
+  .sc.n4 li { font-size: calc(1.9vw * var(--fit, 1)); }
+  .sc.n5 li { font-size: calc(1.7vw * var(--fit, 1)); }
   .foot { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 1.8vh; margin-top: 1.2vh; font-size: 1.5vw; color: var(--dust); }
   .foot b { color: var(--chalk); font-weight: 600; }
   .empty { color: var(--dust); font-size: 2vw; }
@@ -100,8 +100,8 @@
     #targets { padding: 3vh 5vw 2vh; }
     .course { font-size: 3.6vw; } .clock { font-size: 4vw; } .unit { font-size: 5vw; }
     .col h2 { font-size: 2.6vw; }
-    .lt li, .lt.n3 li, .lt.n4 li, .lt.n5 li { font-size: 4.2vw; }
-    .sc li, .sc.n4 li, .sc.n5 li { font-size: 3.4vw; }
+    .lt li, .lt.n3 li, .lt.n4 li, .lt.n5 li { font-size: calc(4.2vw * var(--fit, 1)); }
+    .sc li, .sc.n4 li, .sc.n5 li { font-size: calc(3.4vw * var(--fit, 1)); }
     .foot { font-size: 2.6vw; }
     #chip .t { font-size: 3.4vw; } #chip .n { font-size: 2.4vw; }
     #banner { font-size: 3.6vw; }
@@ -131,8 +131,8 @@
   #ann[hidden] { display: none; }
   .ann-kick { display: flex; justify-content: space-between; align-items: baseline; color: #F26B1D; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; font-size: clamp(12px, 1.4vw, 18px); margin-bottom: 3vh; }
   .ann-kick #ann-date { color: #8A94A3; letter-spacing: .08em; text-transform: none; font-weight: 600; }
-  #ann-title { font-size: clamp(32px, 4.6vw, 68px); font-weight: 800; line-height: 1.15; margin-bottom: 2.2vh; }
-  #ann-text { font-size: clamp(22px, 3vw, 44px); line-height: 1.45; color: #DDE3EA; max-width: 30em; }
+  #ann-title { font-size: calc(clamp(32px, 4.6vw, 68px) * var(--fit, 1)); font-weight: 800; line-height: 1.15; margin-bottom: 2.2vh; }
+  #ann-text { font-size: calc(clamp(22px, 3vw, 44px) * var(--fit, 1)); line-height: 1.45; color: #DDE3EA; max-width: 30em; }
   .ann-foot { margin-top: auto; display: flex; align-items: center; gap: 14px; color: #8A94A3; font-size: clamp(12px, 1.3vw, 16px); }
   .ann-foot .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #2A313C; margin-right: 6px; }
   .ann-foot .dot.on { background: #F26B1D; }
@@ -1389,6 +1389,7 @@ window.SIGNAGE_SEED = {
     $('ann-count').textContent = items.length > 1 ? ((annIdx + 1) + ' / ' + items.length) : '';
     for (i = 0; i < Math.min(items.length, 12); i++) { dots += '<span class="dot' + (i === annIdx ? ' on' : '') + '"></span>'; }
     $('ann-dots').innerHTML = dots;
+    fitView($('ann'));
   }
   function startAnnRotation(items) {
     var key = items.length + '|' + ((items[0] && items[0].title) || '') + '|' + ((items[0] && items[0].date) || '');
@@ -1401,6 +1402,18 @@ window.SIGNAGE_SEED = {
       annTimer = setInterval(function () { annIdx = (annIdx + 1) % items.length; paintAnn(items); }, secs * 1000);
     }
   }
+  function fitView(el) {
+    /* auto-fit: if the card's content is taller than its box, scale its text down (5% steps, 45% floor).
+       The targets card clips inside its .grid, so that is the box we measure; announcements measure themselves. */
+    if (!el || el.hidden) { return; }
+    var box = el.querySelector('.grid') || el, s = 1, guard = 0;
+    el.style.setProperty('--fit', '1');
+    while (box.scrollHeight > box.clientHeight + 1 && s > 0.45 && guard++ < 14) {
+      s = Math.round((s - 0.05) * 100) / 100;
+      el.style.setProperty('--fit', String(s));
+    }
+  }
+  window.addEventListener('resize', function () { fitView($('targets')); fitView($('ann')); });
   function deckSrc(url, delay) {
     if (!url) { return ''; }
     var base = url.split('?')[0].replace(/\/pub$/, '/embed');
@@ -1464,6 +1477,8 @@ window.SIGNAGE_SEED = {
       ensureDeck(); ensureVideo(false);
     }
     show(dec.mode);
+    if (dec.mode === 'targets') { fitView($('targets')); }
+    if (dec.mode === 'deck' && !$('ann').hidden) { fitView($('ann')); }
   }
   function renderChip(dec, d) {
     text('c-clock', fmtClock(d));
@@ -1601,6 +1616,7 @@ window.SIGNAGE_SEED = {
     var i, els = [$('targets'), $('ann')];
     for (i = 0; i < els.length; i++) { if (els[i]) { els[i].style.zoom = scale; } }
     var v = $('ctl-size-val'); if (v) { v.textContent = Math.round(scale * 100) + '%'; }
+    fitView($('targets')); fitView($('ann'));
   }
   function setScale(delta) {
     scale = Math.min(1.6, Math.max(0.7, Math.round((scale + delta) * 20) / 20));
