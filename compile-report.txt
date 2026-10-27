@@ -1,8 +1,8 @@
-EHS Displays compile - Tue Oct 27, 2026 5:32 AM CDT
-Rooms: 594 rows | Courses compiled: 189 | Issues: 1
+EHS Displays compile - Tue Oct 27, 2026 5:54 AM CDT
+Rooms: 594 rows | Courses compiled: 189 | Issues: 0
 
-ISSUES (fix in the named file; the wall shows last good data meanwhile):
-Announcements scrape failed (fetch skipped (--no-fetch)) - keeping yesterday's.
+No issues. Every course compiled clean.
 
 186 course(s) have no scope & sequence file yet - their walls show the announcements deck. (2-D Art Seminar; 3-D Art Seminar; AP Art Studio; AP Biology; AP Calculus AB; AP Calculus BC; AP Chemistry; AP Computer Science A PLTW; ... 178 more)
+Announcements: 19 items from the school site (October 22, 2026).
 data.json written (content changed).
