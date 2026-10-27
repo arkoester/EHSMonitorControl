@@ -14,6 +14,8 @@ Layout (all inside the repo):
   src/sns/*.xlsx                             scope & sequence files; filenames do not
                                              matter - the course name is read from
                                              row 1 of each file
+  src/day-types.txt                          date -> day type overrides (half days,
+                                             surprise closures), editable from a phone
   data.json, version.txt                     what the screens read (written here)
   compile-report.txt                         what happened last run (written here)
 
@@ -344,6 +346,31 @@ def main():
             f.write(msg + "\n")
         print(msg)
         sys.exit(1)
+    # src/day-types.txt: date overrides typed from a phone ("2026-10-30  Half Day  Pep assembly").
+    # They go first so an exact-date line wins over the DayTypes tab and the weekday rule.
+    extra_days = []
+    dt_file = os.path.join(src, "day-types.txt")
+    if os.path.exists(dt_file):
+        with open(dt_file, encoding="utf-8-sig") as f:
+            for n, line in enumerate(f, 1):
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                m = re.match(r"^(\S+)\s+(Regular|Wednesday|Half Day|No School|[A-Za-z][A-Za-z ]*?)(?:\s{2,}|\t|\s+-\s+|$)(.*)$", line)
+                try:
+                    if not m:
+                        raise ValueError("expected DATE, two spaces, DAY TYPE")
+                    extra_days.append({"date": parse_date(m.group(1)).isoformat(), "day_type": m.group(2).strip(), "note": m.group(3).strip()})
+                except ValueError as e:
+                    issues.append("day-types.txt line %d: %s (%s)." % (n, e, line))
+    if extra_days:
+        known = {str(b.get("day_type", "")).strip().lower() for b in bell} | {"no school"}
+        for x in extra_days:
+            if x["day_type"].lower() not in known:
+                issues.append("day-types.txt: '%s' is not a bell in the registry (have: %s) - screens will treat %s as announcements-only." % (x["day_type"], ", ".join(sorted(known)), x["date"]))
+        daytypes = extra_days + daytypes
+        notes.append("Day-type overrides from day-types.txt: %s." % "; ".join("%s=%s" % (x["date"], x["day_type"]) for x in extra_days))
+
     settings = {}
     for r in settings_rows:
         if r.get("key"):

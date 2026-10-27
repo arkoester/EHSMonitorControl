@@ -1,0 +1,7 @@
+# Day-type overrides for specific dates - one per line:  DATE   DAY TYPE   optional note
+# Edit this file on github.com (pencil icon works from a phone), commit, then Actions > Publish displays > Run workflow.
+# The day type must match a bell in the registry: Regular, Wednesday, Half Day, or No School.
+# These win over the registry's DayTypes tab and over the weekday rule. Lines starting with # are ignored.
+#
+# 2026-10-30   Half Day     Pep assembly
+# 2026-11-02   No School    Example

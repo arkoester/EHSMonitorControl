@@ -79,6 +79,14 @@ Optional later step: a SharePoint drop folder that syncs into `src/sns`.
   **Text size** (A-/A+) is there too and is saved on that screen for good.
   Manual mode shows an orange MANUAL badge, wears off at the next bell or
   after an hour, and never survives into the next day.
+- **Half days and surprise schedules:** a `Half Day` bell (the 1/2-day pep-assembly
+  schedule: 15-minute periods, pep rally 9:21-10:15) is in the registry. To put
+  every screen on it for a date, add one line to `src/day-types.txt` on
+  github.com (`2026-10-30   Half Day   Pep assembly`), commit, Run workflow.
+  For a single screen when that did not happen, tap the corner &#8942; and
+  choose the bell under **Bell today**; it holds on that screen until midnight
+  and shows a badge. A new schedule pattern = new rows in the Bell tab under a
+  new day-type name.
 - **Office:** bell changes, day types, room moves, and the broadcast banner
   live in the registry (`src/registry/`). They ride the nightly compile - for
   a same-morning change (surprise late start at 6:45), upload the edited

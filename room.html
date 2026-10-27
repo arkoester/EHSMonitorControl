@@ -218,6 +218,7 @@
       <label class="ctl-lab">Hour <select id="ctl-period"></select></label>
       <label class="ctl-lab">Unit <select id="ctl-unit"></select></label>
     </div>
+    <div class="ctl-row" id="ctl-bells"><span class="ctl-lab">Bell today</span></div>
     <div class="ctl-row ctl-size" id="ctl-size">
       <span class="ctl-lab">Text size</span>
       <button data-size="-">A&minus;</button><span id="ctl-size-val">100%</span><button data-size="+">A+</button>
@@ -227,7 +228,7 @@
       <button data-act="reload">Reload screen</button>
     </div>
     <div class="pk-note" id="ctl-status"></div>
-    <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. It never carries into tomorrow. Text size is saved on this screen.</div>
+    <div class="pk-note">Manual mode holds until the next bell (or one hour), then the schedule takes back over. "Bell today" (&frac12; Day for assembly and half days) holds on this screen until midnight; tap it again for the normal bell. Neither carries into tomorrow. Text size is saved on this screen.</div>
     <button id="ctl-pick" class="ctl-link">Set this screen's room&hellip;</button>
   </div>
 </div>
@@ -1494,9 +1495,9 @@ window.SIGNAGE_SEED = {
     var d = now();
     text('t-clock', fmtClock(d));
     if (!data) { return; }
-    var dec = E.decide(d, data, room);
+    var dec = E.decide(d, dataNow(), room);
     dec = applyOverride(dec);
-    var key = [dec.mode, dec.period ? dec.period.period : '', dec.course ? dec.course.course : '', dec.unit ? E.field(dec.unit, ['unit']) : '', dec.dayType, ovr ? 'M' + ovr.mode : ''].join('|');
+    var key = [dec.mode, dec.period ? dec.period.period : '', dec.course ? dec.course.course : '', dec.unit ? E.field(dec.unit, ['unit']) : '', dec.dayType, ovr ? 'M' + ovr.mode : '', bellOvr ? 'B' + bellOvr.type : ''].join('|');
     if (key !== last.key) { render(dec, d); last.key = key; }
     renderChip(dec, d); renderBar(dec, d); renderBanner(); setStatus();
     if (demo) { text('d-read', dec.mode.toUpperCase() + ' \u00b7 ' + dec.reason + ' \u00b7 ' + (dec.dayType || 'no school') + (dec.period ? ' \u00b7 ' + dec.period.label + ' (' + Math.floor(dec.period.elapsed) + ' min in)' : '')); }
@@ -1505,7 +1506,7 @@ window.SIGNAGE_SEED = {
   /* ---- heartbeat: lets a status sheet show which rooms are live ---- */
   function heartbeat() {
     if (!data || !data.settings.heartbeat_url || demo) { return; }
-    var dec = E.decide(now(), data, room);
+    var dec = E.decide(now(), dataNow(), room);
     var url = data.settings.heartbeat_url + (data.settings.heartbeat_url.indexOf('?') < 0 ? '?' : '&') +
       'room=' + encodeURIComponent(room) + '&mode=' + dec.mode + '&period=' + encodeURIComponent(dec.period ? dec.period.label : '') +
       '&course=' + encodeURIComponent(dec.course ? dec.course.course : '') + '&reason=' + encodeURIComponent(dec.reason);
@@ -1582,6 +1583,52 @@ window.SIGNAGE_SEED = {
   })();
 
 
+  /* ---- bell-schedule override for THIS screen, today only (half day the office did not publish) ----
+     The all-screens way is a line in src/day-types.txt (or the DayTypes tab) + Publish Now; this is the
+     fallback for one room when that has not happened. Survives a reload via sessionStorage, dies at midnight. */
+  var bellOvr = null;   /* { type, day } */
+  try { var bo = JSON.parse(sessionStorage.getItem('ehs_bell') || 'null'); if (bo && bo.day === E.ymd(new Date())) { bellOvr = bo; } } catch (e) {}
+  function dataNow() {
+    if (!data || !bellOvr || bellOvr.day !== E.ymd(now())) { if (bellOvr && data && bellOvr.day !== E.ymd(now())) { bellOvr = null; try { sessionStorage.removeItem('ehs_bell'); } catch (e) {} } return data; }
+    var d = {}, k;
+    for (k in data) { if (Object.prototype.hasOwnProperty.call(data, k)) { d[k] = data[k]; } }
+    d.daytypes = [{ date: bellOvr.day, day_type: bellOvr.type, note: 'set on this screen' }].concat(data.daytypes || []);
+    return d;
+  }
+  function bellTypes() {
+    var out = [], seen = {}, i, t, b = (data && data.bell) || [];
+    for (i = 0; i < b.length; i++) { t = String(b[i].day_type || '').trim(); if (t && !seen[E.norm(t)]) { seen[E.norm(t)] = 1; out.push(t); } }
+    return out;
+  }
+  function bellButtonLabel(t) {
+    var n = E.norm(t);
+    if (n === 'half_day') { return '\u00BD Day'; }
+    if (n === 'no_school') { return 'No bell'; }
+    return t;
+  }
+  function fillBellButtons() {
+    /* one button per bell in the registry, plus "Scheduled" (what today would be anyway); the active one is lit.
+       Tapping the lit button, or Scheduled, goes back to the schedule. */
+    var row = $('ctl-bells'), types = bellTypes(), i, b, auto = data ? E.dayTypeFor(now(), data.daytypes, data.settings) : null;
+    while (row.children.length > 1) { row.removeChild(row.lastChild); }
+    b = document.createElement('button'); b.setAttribute('data-bell', ''); b.textContent = 'Scheduled' + (auto ? ' \u00B7 ' + (auto.type || 'no school') : ''); row.appendChild(b);
+    for (i = 0; i < types.length; i++) {
+      if (auto && E.norm(types[i]) === E.norm(auto.type)) { continue; }   /* already what "Scheduled" means */
+      b = document.createElement('button'); b.setAttribute('data-bell', types[i]); b.textContent = bellButtonLabel(types[i]); row.appendChild(b);
+    }
+    b = document.createElement('button'); b.setAttribute('data-bell', 'No School'); b.textContent = 'No bell'; row.appendChild(b);
+    for (i = 1; i < row.children.length; i++) { row.children[i].classList.toggle('on', row.children[i].getAttribute('data-bell') === (bellOvr ? bellOvr.type : '')); }
+  }
+  $('ctl-bells').onclick = function (ev) {
+    var t = ev.target, v = t && t.getAttribute ? t.getAttribute('data-bell') : null;
+    if (v === null) { return; }
+    if (bellOvr && v === bellOvr.type) { v = ''; }     /* tap the lit one = back to the schedule */
+    bellOvr = v ? { type: v, day: E.ymd(now()) } : null;
+    try { if (bellOvr) { sessionStorage.setItem('ehs_bell', JSON.stringify(bellOvr)); } else { sessionStorage.removeItem('ehs_bell'); } } catch (e) {}
+    ovr = null; setOvBadge(); last.key = ''; tick(); ctlStatus(); fillBellButtons();
+    if (bellOvr) { $('ctl').hidden = true; }            /* one tap and you are done */
+  };
+
   /* ---- manual mode override: situational, ephemeral by design ---- */
   var ovr = null;   /* { mode, setAt, pkey, row, unit } - never persisted; a reload or the next bell clears it */
   function roomRows() {
@@ -1627,6 +1674,7 @@ window.SIGNAGE_SEED = {
   function setOvBadge() {
     var b = $('ovbadge'), names = { targets: 'Targets', deck: 'Announcements', video: 'Video' };
     if (ovr) { b.hidden = false; b.textContent = 'MANUAL \u00B7 ' + names[ovr.mode] + ' \u00B7 until the next bell'; $('setroom').classList.add('manual'); }
+    else if (bellOvr) { b.hidden = false; b.textContent = bellOvr.type.toUpperCase() + ' BELL \u00B7 set on this screen \u00B7 today only'; $('setroom').classList.add('manual'); }
     else { b.hidden = true; $('setroom').classList.remove('manual'); }
   }
   function applyOverride(dec) {
@@ -1656,7 +1704,7 @@ window.SIGNAGE_SEED = {
     if (!mode) { ovr = null; $('ctl-pickers').hidden = true; $('ctl').hidden = true; setOvBadge(); last.key = ''; tick(); return; }
     var rows = roomRows(), pv = $('ctl-period').value, uv = $('ctl-unit').value, rowSel = null, i;
     for (i = 0; i < rows.length; i++) { if (String(rows[i].period) === String(pv)) { rowSel = rows[i]; } }
-    ovr = { mode: mode, setAt: Date.now(), pkey: periodKey(E.decide(now(), data, room)), row: rowSel, unit: uv };
+    ovr = { mode: mode, setAt: Date.now(), pkey: periodKey(E.decide(now(), dataNow(), room)), row: rowSel, unit: uv };
     if (mode !== 'targets') { $('ctl').hidden = true; }
     setOvBadge(); last.key = ''; tick();
   }
@@ -1674,7 +1722,7 @@ window.SIGNAGE_SEED = {
     if (!us.length && row) { sel.options[0].textContent = 'No units in this course yet'; }
   }
   function fillPickers() {
-    var rows = roomRows(), sel = $('ctl-period'), cur = E.decide(now(), data, room), i, o;
+    var rows = roomRows(), sel = $('ctl-period'), cur = E.decide(now(), dataNow(), room), i, o;
     sel.innerHTML = '';
     o = document.createElement('option'); o.value = ''; o.textContent = 'Current hour (automatic)'; sel.appendChild(o);
     for (i = 0; i < rows.length; i++) {
@@ -1693,6 +1741,7 @@ window.SIGNAGE_SEED = {
     applyScale();
     $('ctl-pickers').hidden = !(ovr && ovr.mode === 'targets');
     if (ovr && ovr.mode === 'targets') { fillPickers(); }
+    fillBellButtons();
     var btns = $('ctl-modes').children, cur = ovr ? ovr.mode : '', i;
     for (i = 0; i < btns.length; i++) { btns[i].classList.toggle('on', btns[i].getAttribute('data-mode') === cur); }
     $('ctl').hidden = false;
