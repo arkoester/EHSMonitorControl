@@ -20,10 +20,10 @@
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--ink); color: var(--chalk); font-family: var(--body);
-    overflow: hidden; -webkit-user-select: none; user-select: none; cursor: none;
+    overflow: hidden; -webkit-user-select: none; user-select: none;
     -webkit-font-smoothing: antialiased;
   }
-  body.demo { cursor: default; }
+  body.idle, body.idle * { cursor: none !important; }   /* pointer hides after 3 s still; any mouse move brings it back */
   .view { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms ease; overflow: hidden; }
   .view.active { opacity: 1; }
   .view[hidden] { display: none; }
@@ -1502,6 +1502,15 @@ window.SIGNAGE_SEED = {
     renderChip(dec, d); renderBar(dec, d); renderBanner(); setStatus();
     if (demo) { text('d-read', dec.mode.toUpperCase() + ' \u00b7 ' + dec.reason + ' \u00b7 ' + (dec.dayType || 'no school') + (dec.period ? ' \u00b7 ' + dec.period.label + ' (' + Math.floor(dec.period.elapsed) + ' min in)' : '')); }
   }
+
+  /* ---- mouse pointer: visible while the mouse moves, hidden after 3 s still so walls stay clean ---- */
+  (function () {
+    var t = null;
+    function idle() { if (!demo) { document.body.classList.add('idle'); } }
+    function wake() { document.body.classList.remove('idle'); clearTimeout(t); t = setTimeout(idle, 3000); }
+    ['mousemove', 'mousedown', 'wheel'].forEach(function (ev) { document.addEventListener(ev, wake, { passive: true }); });
+    idle();
+  })();
 
   /* ---- heartbeat: lets a status sheet show which rooms are live ---- */
   function heartbeat() {
