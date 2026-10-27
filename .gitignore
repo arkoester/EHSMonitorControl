@@ -1,0 +1,10 @@
+# The compiler now runs inside GitHub Actions, so its inputs live in the repo under src/.
+# Keep local scratch out:
+*.log
+.compile-changed
+~$*.xlsx
+# old PC-based tooling (kept out of the public site)
+*.ps1
+*.bat
+*.csv
+Publish Now.bat

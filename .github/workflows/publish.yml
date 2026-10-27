@@ -1,0 +1,64 @@
+name: Publish displays
+
+# Runs the compiler in GitHub's cloud - no PC has to be on.
+#   Nightly:  10:15 UTC every day        = 5:15 AM CDT / 4:15 AM CST
+#   Mornings: every 30 min 12:00-15:30 UTC on weekdays = 7:00-10:30 CDT / 6:00-9:30 CST
+#   Afternoons: hourly 16:00-21:00 UTC on weekdays
+#   Publish Now: Actions tab > "Publish displays" > Run workflow (works from the GitHub phone app)
+# Cron runs can start a few minutes late when GitHub is busy; that is normal.
+on:
+  schedule:
+    - cron: '15 10 * * *'
+    - cron: '*/30 12-15 * * 1-5'
+    - cron: '0 16-21 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-displays
+  cancel-in-progress: false
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the site
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install openpyxl
+        run: pip install --quiet openpyxl
+
+      - name: Compile data.json
+        run: python3 compile.py --site .
+
+      - name: Show the report
+        run: cat compile-report.txt
+
+      - name: Commit and publish
+        run: |
+          git config user.name "EHS Displays bot"
+          git config user.email "displays-bot@users.noreply.github.com"
+          git add -A data.json version.txt compile-report.txt
+          git add -u src/sns                                   # the "_READ ME - problems" note, when it is removed
+          [ -f "src/sns/_READ ME - problems found last night.txt" ] && git add "src/sns/_READ ME - problems found last night.txt"
+          if git diff --cached --quiet; then
+            echo "Nothing changed - nothing to publish."
+            exit 0
+          fi
+          git commit -q -m "data $(date -u +'%Y-%m-%d %H:%M') UTC"
+          # someone may have uploaded a file through the website since checkout: rebase, then push
+          for i in 1 2 3; do
+            git pull --rebase -q origin "${GITHUB_REF_NAME}" && git push -q origin HEAD:"${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          echo "PUSH FAILED after 3 tries"; exit 1

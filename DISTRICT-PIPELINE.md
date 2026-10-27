@@ -1,79 +1,76 @@
-# EHS Room Displays - District Pipeline (all-Microsoft)
+# EHS Room Displays - Pipeline (runs itself on GitHub)
 
-The production path. Teachers edit locked `userid.xlsx` files in a shared
-SharePoint library; a scheduled script compiles everything each night into one
-`data.json` beside the website; every screen reads that file automatically.
-No Google anywhere, no site edits ever, and nothing a teacher can break.
+The production path. The compiler runs **inside GitHub Actions** on a
+schedule - no PC has to be on, nobody has to be logged in, and "Publish Now"
+is a button in the GitHub phone app. Teachers' scope & sequence workbooks
+and the office registry live in the repo under `src/`; every run reads them,
+scrapes the school's Daily Announcements page, compiles `data.json`, and
+commits it. Every screen reads that file automatically. No site edits, ever.
 
 ## The shape of it
 
 ```
-SharePoint library "CTE Displays"            One always-on PC (4:15 AM)          The site
-  EHS_room_display_data.xlsx  (office)  -->  Compile-Displays.ps1  -->  data.json --> every screen
-  teachers\akoester.xlsx      (teacher)          |                        (GitHub Pages now,
-  teachers\sbhooshan1.xlsx    (teacher)          +-> compile-report.txt    district server later)
-  teachers\sbhooshan2.xlsx    (teacher)              (back into the library)
+Repo  src/registry/EHS_room_display_data.xlsx (office)   GitHub Actions (on schedule)      The site
+      src/sns/*.xlsx  (teachers' scope & sequence)  -->  compile.py  -->  data.json  -->  every screen
+      ehs.ecusd7.org/link-2 (daily announcements)          |         version.txt
+                                                           +-> compile-report.txt (in the repo, read it on your phone)
 ```
 
-- The **registry** (`EHS_room_display_data.xlsx`) is office-owned. Its
-  **Rooms** tab is *generated* from the Schedule Matrix (room + period ->
-  course + teacher + teacher number) and can be regenerated every semester
-  with nothing lost, because nothing hand-typed lives there. Its
-  **Teachers** tab is the one hand-maintained sheet: teacher number, name,
-  and **userid** - typed once, kept forever. The userid is the teacher file's
-  name, so same-surname teachers can never be confused: `sbhooshan1.xlsx`
-  and `sbhooshan2.xlsx` are different people by definition.
-- Each **teacher file** has one tab per course. Only the yellow cells are
-  editable; tabs cannot be renamed, added, or deleted (structure lock). It
-  works in desktop Excel and Excel in the browser, autosaves, co-authors.
-- The **compiler** validates before it publishes: missing files, renamed-or-
-  missing tabs, unreadable dates, live units with blank targets, and courses
-  with nothing active today all land in `compile-report.txt` in the library.
-  A course that fails keeps **yesterday's data on the wall** - screens never
-  go blank because of a bad edit.
+- The **registry** (`src/registry/EHS_room_display_data.xlsx`) is office-owned:
+  Settings, Weeks, Bell, DayTypes and a **Rooms** tab *generated* from the
+  Schedule Matrix (room + period -> course + teacher). It is a public copy:
+  teacher numbers, section numbers and enrollment are stripped before it goes
+  in the repo; the full workbook stays in the department folder.
+- **Scope & sequence files** go in `src/sns/`. Filenames do not matter: the
+  compiler opens each file and reads the course name from row 1, then matches
+  it to the registry's Course column (parentheticals and "- Full Year" style
+  suffixes ignored; "AP Macro" matches "AP Macroeconomics"). Units are read
+  from every row whose Chapter/Unit cell has text, so both the 12-row district
+  template and 2-row compact layouts work.
+- The **compiler** validates before it publishes: unreadable files, courses
+  with nothing active today, live units with blank targets, duplicate or
+  unmatched course names all land in `compile-report.txt`. A course that
+  fails keeps **yesterday's data on the wall**; a failed announcements scrape
+  keeps yesterday's announcements - screens never go blank because of a bad
+  edit or a website hiccup.
 
-## One-time setup
+## Schedule (GitHub Actions, in `.github/workflows/publish.yml`)
 
-1. **Library.** Create the SharePoint document library, add the registry and
-   a `teachers` folder. Everyone gets access to the library; each teacher
-   only ever opens their own file (protection does the rest).
-2. **Provision teacher files.** Fill the userid column of the registry's
-   Teachers tab, then run `Provision-Teachers.ps1` on any PC with Excel.
-   It reads the Teachers tab directly (no roster file) and stamps one locked
-   `userid.xlsx` per teacher with a tab for every course from both
-   semesters. Re-run any time: new teachers get a file, existing files get
-   any missing course tab added, nothing else is touched.
-3. **The compiler PC.** Any always-on district PC, logged into the account
-   that will run the task:
-   - Sync the library in OneDrive; right-click the folder -> **Always keep on
-     this device** (files-on-demand placeholders break scripts).
-   - `Install-Module ImportExcel -Scope CurrentUser` (reads xlsx without
-     Excel - safe for headless scheduled runs; Excel itself is only needed
-     for the one-time provisioning above).
-   - `git clone` the site repo to `C:\ehs-display`, push once by hand so the
-     credential manager stores the GitHub token.
-   - Edit the CONFIG block at the top of `Compile-Displays.ps1`.
-   - Schedule it **as that user, "run whether user is logged on or not"**:
-     `schtasks /Create /TN "EHS Displays Nightly" /SC DAILY /ST 04:15 /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\ehs-display\Compile-Displays.ps1"`
-     (Do not run it as SYSTEM - SYSTEM has no OneDrive sync.)
-   Then a second, morning schedule - because the office posts today's
-   announcements *after* the 4:15 run, and "hands-free" only holds if the
-   compiler looks again once they have. Every 30 minutes, 7:00-9:30:
-     `schtasks /Create /TN "EHS Displays Morning" /SC DAILY /ST 07:00 /RI 30 /DU 02:30 /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\ehs-display\Compile-Displays.ps1"`
-   Runs take about a minute and only push when something changed, so the
-   extra runs cost nothing. If the office posts at a fixed time, one run
-   ten minutes after it is enough.
-4. **First compile.** Double-click `Publish Now.bat`. Screens flip from
-   sample data to live data within about ten minutes of the push landing
-   (GitHub's CDN caches the file for up to ten minutes).
+| When (Central) | What |
+|---|---|
+| 5:15 AM daily (4:15 after the November clock change) | nightly compile - always refreshes `data.json` so screens never see "data is N days old" |
+| 7:00-10:30 AM weekdays, every 30 min | catches the office's morning post of today's announcements |
+| hourly to ~4 PM weekdays | late edits |
+| **Publish Now** | GitHub app or website: **Actions > Publish displays > Run workflow**. Live on screens within about ten minutes (GitHub Pages + CDN). |
+
+Runs only commit when something on the walls changed (or once a day
+regardless), so the extra runs cost nothing and the history stays readable.
+GitHub's cron can start a few minutes late when it is busy - normal.
+
+## Getting a teacher's scope & sequence onto the wall
+
+A teacher sends you their S&S workbook (any filename). Put it in `src/sns/`
+in the repo - upload through the GitHub website (**Add file > Upload
+files** inside `src/sns`), or drop it in this chat and ask Claude to commit
+it. The next run (or Publish Now) compiles it. If the course name in row 1
+does not match the registry, the report names the file and the fix, and the
+same note is written to `src/sns/_READ ME - problems found last night.txt`.
+Optional later step: a SharePoint drop folder that syncs into `src/sns`.
+
+## One-time setup (done)
+
+1. Repo contains `compile.py`, `.github/workflows/publish.yml`, `src/`.
+2. Repo **Settings > Actions > General > Workflow permissions** must be
+   **Read and write** (the workflow commits `data.json`). If a run fails at
+   the push step with 403, that is the switch.
+3. GitHub Pages serves the `main` branch root (already live).
 
 ## Daily life
 
-- **Teachers:** open your file from the library, type in yellow cells, close.
-  It is on your wall the next school day. That is the whole job. Running
-  ahead or behind? Put an `x` in Current (teacher file) or `now` in the
-  unit's Notes cell (scope & sequence file) - the calendar yields to you
-  until you clear it. Need the wall to show something else *right now*
+- **Teachers:** keep the scope & sequence workbook current and send it to the
+  department chair when it changes; it is in `src/sns/` and on the wall by
+  the next run. Running ahead or behind? Put `now` (or `x`) at the start of
+  the unit's Notes cell - the calendar yields to you until you clear it. Need the wall to show something else *right now*
   (assembly ran long, the bell is off)? Tap the corner &#8942; on the
   screen: Auto / Targets / Announcements / Video. Choosing Targets also
   offers **Hour** and **Unit** pickers, so you can put any period's
@@ -83,10 +80,10 @@ SharePoint library "CTE Displays"            One always-on PC (4:15 AM)         
   Manual mode shows an orange MANUAL badge, wears off at the next bell or
   after an hour, and never survives into the next day.
 - **Office:** bell changes, day types, room moves, and the broadcast banner
-  live in the registry. They also ride the nightly compile - for a
-  same-morning change (surprise late start at 6:45), edit the registry and
-  double-click **Publish Now**; screens update within about ten minutes
-  (the CDN cache window - see Scale notes).
+  live in the registry (`src/registry/`). They ride the nightly compile - for
+  a same-morning change (surprise late start at 6:45), upload the edited
+  registry and press **Run workflow**; screens update within about ten
+  minutes (the CDN cache window - see Scale notes).
 - **Daily announcements, hands-free:** the compiler scrapes the school's
   public Daily Announcements page (ehs.ecusd7.org/link-2) every night, and
   every idle screen rotates through the items - the page's own date line,
@@ -104,8 +101,9 @@ SharePoint library "CTE Displays"            One always-on PC (4:15 AM)         
   takes over the window. Kiosk sound note: launch the browser with
   `--autoplay-policy=no-user-gesture-required` so the video plays with
   audio and no click.
-- **You:** skim `compile-report.txt` in the library with your coffee. It
-  names the file, the tab, and the unit for every issue.
+- **You:** skim `compile-report.txt` in the repo with your coffee (the
+  GitHub app shows it; the Actions run log shows the same text). It names
+  the file and the unit for every issue.
 
 ## Scope & sequence as a source (no second document)
 
@@ -301,29 +299,36 @@ localStorage between boots, and no sleep timer on the display.
 
 ## If a file gets overwritten or deleted
 
-SharePoint has this covered; nothing extra was built. Overwritten file:
-open it in SharePoint, **... > Version history**, restore. Deleted file:
-the library's **Recycle bin**, then the site collection recycle bin (about
-93 days in total). The wall keeps showing the last good compile meanwhile.
+Git has every version of everything in `src/`: open the file on GitHub,
+**History**, pick the version, download it. The wall keeps showing the last
+good compile meanwhile.
 
 ## Migrating to district hosting later
 
-Designed as a two-line change on the compiler PC, invisible to teachers:
-set `$PublishMode = 'copy'` and `$WebRootPath` to the district web path IT
-gives you, and copy the site files (`index.html`, `room.html`, `config.js`)
-there once. Screens get re-pointed to the district URL one time (or IT
-redirects the old one). Nothing else in the pipeline changes.
+Invisible to teachers. The workflow's last step copies `index.html`,
+`room.html`, `config.js`, `data.json` and `version.txt` to wherever IT says
+(an SFTP/rsync step with a repo secret), or IT pulls from the repo. Screens
+get re-pointed to the district URL one time. Nothing else changes.
 
 ## Troubleshooting
 
-- **Compile ran but data is stale on a screen:** screens re-check data.json
-  every ~60 s and hard-reload nightly; check the screen's clock and network.
-- **`Import-Excel` not found:** the module install ran under a different
-  user. Install under the task's account.
-- **Git push fails at 4 AM:** the stored token expired; push once by hand.
-- **A teacher "lost" a tab:** they can't - structure is locked. If a tab is
-  missing, the file predates that course; re-run provisioning after adding
-  the course to their roster line (or unprotect with the office password and
-  copy a tab by hand).
-- **Two teachers share a course name:** fine - courses are read per
-  (userid, course), and each room row points at its own teacher's file.
+- **Compile ran but data is stale on a screen:** screens re-check
+  `version.txt` every 1-2 minutes in the morning and reload nightly; check
+  the screen's clock and network. The amber note on the screen names the
+  cause (time zone, clock, stale data).
+- **Walls say "data is N days old":** the workflow has not run. Open
+  **Actions** on the repo: a red run shows the step and the error. The
+  usual cause is Workflow permissions (see One-time setup); the second is a
+  registry edit that broke a tab name - the report says which.
+- **Announcements did not change today:** the report says "Announcements:
+  N items (date)". If the date is yesterday's, the office has not posted
+  yet - the morning runs will catch it. If the report says the scrape
+  failed, the website's layout changed; the parser in `compile.py`
+  (`parse_announcements`) expects a bold "ANNOUNCEMENTS <date>" header
+  followed by one paragraph per item.
+- **A scope & sequence file is ignored:** the course name in row 1 does not
+  match the registry, or two files claim the same course. The report and
+  `src/sns/_READ ME - problems found last night.txt` say which.
+- **Two teachers teach the same course:** one S&S file per *course name*; if
+  they pace differently, put the room-specific file's path in the Rooms
+  tab's Content source column for that room.

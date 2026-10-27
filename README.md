@@ -12,21 +12,24 @@ calendar), and correct their own clocks.
 
 ## What lives here
 
-Only the public site: `index.html`, `room.html`, `config.js`, and the
-compiled `data.json` + `version.txt` the nightly compiler pushes. Nothing
-here is edited by hand after setup. The published data is deliberately
-slim - room, period, course, teacher - with section numbers, enrollment,
-and staff logins kept in the district's SharePoint registry, not on the
-public internet.
+The public site (`index.html`, `room.html`, `config.js`), the compiled
+`data.json` + `version.txt` the screens read, and the compiler itself:
+`compile.py`, its inputs under `src/` (the office registry and the
+teachers' scope & sequence workbooks), and the GitHub Actions workflow
+that runs it on a schedule. The published data is deliberately slim -
+room, period, course, teacher - with section numbers, enrollment, teacher
+numbers and staff logins kept in the department's full registry, not here.
 
 ## Where the content comes from
 
-Teachers keep their scope & sequence workbooks (or a locked per-teacher
-file) in a SharePoint library. A scheduled script on a district PC reads
-them every night, validates, compiles `data.json`, and pushes it here.
-The office maintains bell times, day types, and the room map in one
-registry workbook in the same library. Daily announcements are read from
-the school website; the Friday show plays straight from the EHS
+Teachers' scope & sequence workbooks sit in `src/sns/` (any filename -
+the course name inside the file is what counts). GitHub Actions runs
+`compile.py` every morning and through the school day: it validates,
+compiles `data.json`, and commits it - no PC, no login, nothing to keep
+running. **Publish Now** = Actions tab > Publish displays > Run workflow.
+The office maintains bell times, day types, and the room map in the
+registry workbook under `src/registry/`. Daily announcements are read
+from the school website; the Friday show plays straight from the EHS
 Broadcasting channel.
 
 Setup, daily operation, the polling schedule, debugging order, and the
