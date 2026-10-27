@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-27T12:43:37",
+ "generated": "2026-10-27T16:04:48",
  "settings": {
   "school_name": "Edwardsville High School",
   "default_day_type": "Regular",
@@ -122,6 +122,62 @@
    "label": "6th Hour",
    "start": "12:01 PM",
    "end": "12:45 PM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "0",
+   "label": "Zero Hour",
+   "start": "6:25 AM",
+   "end": "7:10 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "1",
+   "label": "1st Hour",
+   "start": "7:15 AM",
+   "end": "7:30 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "2",
+   "label": "2nd Hour",
+   "start": "7:36 AM",
+   "end": "7:51 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "3",
+   "label": "3rd Hour",
+   "start": "7:57 AM",
+   "end": "8:12 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "4",
+   "label": "4th Hour",
+   "start": "8:18 AM",
+   "end": "8:33 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "5",
+   "label": "5th Hour",
+   "start": "8:39 AM",
+   "end": "8:54 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "6",
+   "label": "6th Hour",
+   "start": "9:00 AM",
+   "end": "9:15 AM"
+  },
+  {
+   "day_type": "Half Day",
+   "period": "PR",
+   "label": "Pep Rally",
+   "start": "9:21 AM",
+   "end": "10:15 AM"
   }
  ],
  "daytypes": [
