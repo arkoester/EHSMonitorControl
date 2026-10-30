@@ -1,8 +1,8 @@
-EHS Displays compile - Thu Oct 29, 2026 7:48 PM CDT
+EHS Displays compile - Fri Oct 30, 2026 11:41 AM CDT
 Rooms: 594 rows | Courses compiled: 189 | Issues: 0
 
 No issues. Every course compiled clean.
 
 186 course(s) have no scope & sequence file yet - their walls show the announcements deck. (2-D Art Seminar; 3-D Art Seminar; AP Art Studio; AP Biology; AP Calculus AB; AP Calculus BC; AP Chemistry; AP Computer Science A PLTW; ... 178 more)
 Announcements: 11 items from the school site (October 28, 2026).
-No changes since last compile - data.json left as is.
+data.json written (daily refresh, no content change).
