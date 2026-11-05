@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-04T11:58:24",
+ "generated": "2026-11-05T11:58:57",
  "settings": {
   "school_name": "Edwardsville High School",
   "default_day_type": "Regular",
@@ -5490,77 +5490,82 @@
  },
  "announcements": [
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "Interact Club",
    "text": "will be selling popcorn for $1 at lunch this week. Make sure to stop by to get a salty snack!"
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "It’s National French Week",
    "text": "& the EHS French Club has put pieces of paper with the Eiffel Tower around the Building. If you find one of these, take it to room A228 to get a little treat!"
   },
   {
-   "date": "November 4, 2026",
-   "title": "The next Tri-M Music Honor Society",
-   "text": "all member meeting will be TODAY, 11/4 at 12:45 in the orchestra room. This is a mandatory event for all current Tri-M members. Officers will go over important upcoming information. The meeting is expected to take 15-20 minutes."
+   "date": "November 5, 2026",
+   "title": "Here are the meetings",
+   "text": "being held T ODAY after school:"
   },
   {
-   "date": "November 4, 2026",
-   "title": "Girls Basketball Tryouts",
-   "text": "!!! TODAY , 2:00-4:30 in the Lucco-Jackson Gym (A gym!) See you there!"
-  },
-  {
-   "date": "November 4, 2026",
-   "title": "TLC",
-   "text": "we will be meeting TODAY, at the JDWC at 12:45pm. Todd will be with us for this meeting! Please join us and bring a friend!"
-  },
-  {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "S.A.G.A.",
-   "text": "will be meeting Thursday in A209. All are welcome."
+   "text": "room A209."
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "BSU",
-   "text": "will meet tomorrow, Thursday after in room A231."
+   "text": "room A231."
   },
   {
-   "date": "November 4, 2026",
-   "title": "Any boy that's interesting joining wrestling",
-   "text": "this year come to the JDWC after school on Thursday for an informational meeting."
+   "date": "November 5, 2026",
+   "title": "Boys Informational Wrestling meeting",
+   "text": "at the JDWC"
   },
   {
-   "date": "November 4, 2026",
-   "title": "The MIDDLE GROUND CLUB",
-   "text": "is a student-led political discussion group. We are meeting THURSDAY, November 5 th in Ms. Hicks’s Room (a234). All are welcome. Let’s try to find the middle ground and get past party politics. This week’s topic is gun rights. One thing we already agree on: There Will Be Snacks!"
+   "date": "November 5, 2026",
+   "title": "MIDDLE GROUND CLUB",
+   "text": "room A234"
   },
   {
-   "date": "November 4, 2026",
-   "title": "Attention boys wanting to tryout for the boys basketball team",
-   "text": "there will be an informational meeting for tryouts after school on Thursday in the boys locker room. We will have a meeting and then open gym until 4:00."
+   "date": "November 5, 2026",
+   "title": "Boys basketball team",
+   "text": "informational meeting, in the boys locker room."
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "The Edwardsville Care Closet",
    "text": "will be meeting this Friday, November 6th! We are collaborating with the M&M club!"
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
+   "title": "Cards For Hospitalized Kids",
+   "text": "Club will be having a meeting this Friday in room A307. We will have snacks and drinks!"
+  },
+  {
+   "date": "November 5, 2026",
    "title": "The next Interact Club meeting",
    "text": "is this Friday right after school in A-263, Ms. Charlebois’s room. Snacks and drinks will be provided."
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "EHS Drama proudly presents, The Odyssey, November 6th and 7th at 7:30 p.m.",
    "text": "Tickets are $5 (senior citizens are free, but must have a ticket) and are on sale on ehsdrama.ludus.com until the show. Embark on the adventure with us!"
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
    "title": "Attention, freshmen",
    "text": "! Student Council applications are now available in main office or from Mrs. Gray or Ms. Jackson. We are only accepting freshmen at this time. Applications are due by 1:45 p.m. on Monday, November 9 . Interviews will take place November 16–20 . Apply to get involved and help make a difference at EHS!"
   },
   {
-   "date": "November 4, 2026",
+   "date": "November 5, 2026",
+   "title": "The after-school English Tutoring Lab",
+   "text": "will be CLOSED for a department meeting on Monday, November 9."
+  },
+  {
+   "date": "November 5, 2026",
+   "title": "Interested in traveling to Iceland in June of 2028",
+   "text": "? Come to the informational meeting on Tuesday Nov.10th at 6pm in room A176. See the poster hung up around the school and scan the QR Code to RSVP and/or get more information. All 9th-11th graders welcome!"
+  },
+  {
+   "date": "November 5, 2026",
    "title": "Are you interested in traveling to France in June of 2028",
    "text": "but couldn't make it to the informational meeting? No worries! Stop by Mrs. Schwarz in A227 or Mrs. Gray’s in A229 to pick up an information packet. This opportunity is only available every four years but open to all students! The deadline to sign up is Tuesday, Nov. 17. Any questions, email us at cschwarz@ecusd7.org or tgray@ecusd7.org"
   }
